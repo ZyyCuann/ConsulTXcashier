@@ -48,4 +48,3 @@ Hapus di **Profil (logo PG) → Data & cadangan → Hapus data contoh** sebelum 
 - Cetak resi memakai dialog cetak perangkat (printer thermal 58 mm yang terhubung ke tablet).
 - Kirim resi WhatsApp membuka aplikasi WhatsApp dengan teks resi siap kirim.
 - Data hanya ada di tablet tersebut; tidak tersinkron ke perangkat lain.
-
