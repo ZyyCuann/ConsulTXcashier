@@ -11,6 +11,9 @@ jam mengikuti WIB, dan hari ditutup & dibuka otomatis pukul 00.00.
 | `sw.js` | Service worker supaya bisa dipakai tanpa internet |
 | `manifest.webmanifest` + `icon-*.png` | Supaya bisa di-install ke layar utama |
 
+## PENTING: jangan buka index.html langsung dari folder
+Aplikasi harus dibuka lewat **link https** (Netlify/GitHub Pages) supaya bisa di-install, offline, dan menyimpan data dengan aman. Kirim **link**-nya ke teman, bukan ZIP-nya.
+
 ## Cara online-kan (gratis, ±2 menit)
 **Netlify Drop (paling mudah)**
 1. Buka https://app.netlify.com/drop

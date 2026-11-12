@@ -1,0 +1,26 @@
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'Poppins, Arial','primaryColor':'#FFF6EC','primaryBorderColor':'#8540DD','primaryTextColor':'#3B1A5C','lineColor':'#6B5A7A','fontSize':'15px'}}}%%
+flowchart TD
+  A([Pelanggan datang ke RM. Putraguci]) --> B[Lihat etalase & kartu harga P1<br/>harga terlihat sebelum pesan]
+  B --> C[Sebutkan pesanan ke kasir<br/>makan sini / bungkus / nasi box]
+  C --> D[Kasir menyebutkan total<br/>dari layar aplikasi]
+  D --> E{Cara bayar?}
+  E -->|Tunai| F[Serahkan uang]
+  F --> G[Kasir sebut uang diterima & kembalian<br/>'Terima seratus ribu, kembali 38 ribu']
+  E -->|QRIS| H[Scan QRIS di meja kasir]
+  H --> I[Tunjukkan layar HP: nama toko,<br/>nominal, status Berhasil]
+  E -->|Patungan| J[Tiap orang bayar bagiannya<br/>tunai atau QRIS]
+  G --> K{Butuh resi?}
+  I --> K
+  J --> K
+  K -->|Cetak| L[Terima struk 58 mm]
+  K -->|WhatsApp| M[Terima resi digital di WA]
+  K -->|Nota rangkap| N[Terima salinan untuk reimburse]
+  K -->|Tidak| O[Tanpa resi]
+  L --> P([Makan / bawa pulang])
+  M --> P
+  N --> P
+  O --> P
+  classDef act fill:#8540DD,stroke:#8540DD,color:#fff;
+  classDef warn fill:#FFE1DF,stroke:#FF766F,color:#3B1A5C;
+  class A,P act;
+  class E,K warn;

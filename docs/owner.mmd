@@ -1,0 +1,36 @@
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'Poppins, Arial','primaryColor':'#FFF6EC','primaryBorderColor':'#8540DD','primaryTextColor':'#3B1A5C','lineColor':'#6B5A7A','fontSize':'15px'}}}%%
+flowchart TD
+  subgraph PAGI [Pagi · sebelum buka]
+    A([Buka aplikasi di tablet kasir]) --> B[Hari baru terbuka otomatis 00.00<br/>nomor pesanan mulai A-001]
+    B --> C[Belanja pasar → catat Uang keluar<br/>+ perbarui harga beli bahan, mis. ayam 1 kg Rp34.000 = 8 potong]
+    C --> D[Modal tiap menu dihitung ulang otomatis<br/>bahan + bumbu/gas per porsi]
+    D --> E{Harga ayam naik ≥ 10%?}
+    E -->|Ya| F[Tinjau harga jual &<br/>ganti sisipan kartu harga P1]
+    E -->|Tidak| G[Siap jualan]
+    F --> G
+  end
+  subgraph JUAL [Jam buka · kasir bekerja]
+    G --> H[Kasir input pesanan → Bayar → Resi]
+    H --> I[Transaksi tersimpan di tablet<br/>masuk Riwayat, Hari Ini, Menu Laris, Untung]
+    I --> H
+  end
+  subgraph MALAM [Tutup toko]
+    I --> J[Hari Ini: hitung uang laci,<br/>cocokkan QRIS dengan riwayat merchant]
+    J --> K{Selisih kas = 0?}
+    K -->|Tidak| L[Cek ulang kembalian & QRIS<br/>catat alasan]
+    K -->|Ya| M[Tutup hari & simpan]
+    L --> M
+    M --> N[Simpan cadangan → kirim ke Drive/WA pemilik]
+  end
+  subgraph EVAL [Mingguan / bulanan · owner]
+    N --> O[Menu Laris: peringkat, Peta Menu, Saran]
+    O --> P[Untung: uang masuk − uang keluar, margin]
+    P --> Q{Keputusan}
+    Q -->|Menu Bintang| R[Jaga stok di jam ramai]
+    Q -->|Menu Evaluasi| S[Masak lebih sedikit / jadikan paket]
+    Q -->|Margin turun| T[Sesuaikan harga atau resep]
+  end
+  classDef act fill:#8540DD,stroke:#8540DD,color:#fff;
+  classDef warn fill:#FFE1DF,stroke:#FF766F,color:#3B1A5C;
+  class A,N act;
+  class E,K,Q warn;
