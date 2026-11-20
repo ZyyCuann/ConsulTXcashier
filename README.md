@@ -1,6 +1,6 @@
 # Kasir Putraguci (PWA)
 
-Aplikasi kasir tablet untuk RM. Padang Putraguci. Jalan offline, data tersimpan di tablet,
+Aplikasi kasir tablet untuk RM. Padang Putraguci. Jalan offline, data bisa disinkronkan ke satu database toko (Firebase) sehingga sama di semua HP,
 jam mengikuti WIB, dan hari ditutup & dibuka otomatis pukul 00.00.
 
 ## Isi folder
@@ -9,6 +9,8 @@ jam mengikuti WIB, dan hari ditutup & dibuka otomatis pukul 00.00.
 | `index.html` | Tampilan & gaya (palet peach–coral–pink–ungu, Poppins) |
 | `app.js` | Semua logika: kasir, pembayaran, resi, laporan, siklus hari, penyimpanan |
 | `sw.js` | Service worker supaya bisa dipakai tanpa internet |
+| `cloud.js` | Sinkron ke database toko (Firebase Firestore) |
+| `firebase-config.js` | Tempat menempel konfigurasi Firebase — lihat **PANDUAN-FIREBASE.md** |
 | `manifest.webmanifest` + `icon-*.png` | Supaya bisa di-install ke layar utama |
 
 ## PENTING: jangan buka index.html langsung dari folder

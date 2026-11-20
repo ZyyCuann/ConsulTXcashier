@@ -342,6 +342,28 @@ table.data tbody tr:last-child td{border-bottom:0}
 @media (hover:hover) and (pointer:fine){
   .catalog,.cart-b{scrollbar-width:thin;scrollbar-color:#D9C2AE transparent;scrollbar-gutter:stable}
 }
+.hub{max-width:520px;margin:20px auto;padding:0 16px 40px;display:flex;flex-direction:column;gap:14px}
+.hub h1{font-size:22px;margin:8px 0 0}.hub h2{font-size:16px;margin:0}
+.hubc{display:flex;flex-direction:column;gap:10px}
+#hubKode{font-family:ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase}
+.mcard.nasi{cursor:default}
+.mcard .mmain{display:flex;flex-direction:column;flex:1;background:none;border:0;padding:0;margin:0;text-align:left;font:inherit;color:inherit;cursor:pointer;min-height:0}
+.mcard .tn{display:flex;justify-content:space-between;align-items:center;gap:6px;white-space:nowrap;min-height:40px;padding:0 var(--s3);border:0;border-top:1px dashed var(--line);background:var(--bg);font:inherit;font-size:13px;color:var(--muted);cursor:pointer}
+.mcard .tn b{color:var(--purple-d);font-variant-numeric:tabular-nums}.mcard .tn.on{background:var(--purple-t);color:var(--purple-d)}
+.mcard .tq{font-weight:700}
+.brief ol{margin:6px 0 8px;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.blist{display:flex;flex-direction:column;gap:var(--s2)}
+.brow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px var(--s3);align-items:center;padding:var(--s2) var(--s3);border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)}
+.brow>input{grid-column:1;font-weight:600;max-width:260px}.brow .bsent{grid-column:1}.brow .bres{grid-column:2;grid-row:1/3}
+.bsent{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.bres{display:flex;flex-direction:column;align-items:flex-end;gap:0;min-width:96px}
+@media (max-width:560px){.brow{grid-template-columns:1fr}.brow .bres{grid-column:1;grid-row:auto;flex-direction:row;align-items:center;justify-content:space-between}}
+.patlist{display:flex;flex-direction:column}
+.patrow{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);padding:var(--s2) 0;border-bottom:1px solid var(--line)}
+.patrow>span{display:flex;flex-direction:column}
+.pchips{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.pc{min-width:40px;min-height:40px;border-radius:999px;border:1px solid var(--control);background:var(--surface);font:inherit;font-weight:700;cursor:pointer}
+.pc.on{background:var(--purple);border-color:var(--purple);color:#fff}
 </style>
 </head>
 <body>
@@ -365,6 +387,8 @@ document.body.innerHTML='<div style="font:16px/1.5 sans-serif;color:#3B1A5C;back
 '<li>Gunakan <b>Google Chrome</b> versi terbaru.</li><li>Setelah terbuka: menu &#8942; &rarr; <b>Instal aplikasi</b>.</li></ol>'+
 '<p style="font-size:13px;color:#6B5A7A;margin:0">Detail teknis: '+(window.__err||'skrip tidak berjalan')+' &middot; '+location.protocol+'</p></div>';},4000);
 </script>
+<script src="firebase-config.js"></script>
+<script type="module" src="cloud.js"></script>
 <script>
 "use strict";
 var __defProp = Object.defineProperty, __defProps = Object.defineProperties;
@@ -434,13 +458,29 @@ function tombolUangCepat(total) {
   }
   return k.size < 4 && k.add(Math.ceil(total / 1e5) * 1e5 + 5e4), k.size < 4 && k.add(Math.ceil(total / 1e5) * 1e5 + 1e5), [...k].sort((a, b) => a - b).slice(0, 4);
 }
+function unitPatungan(items) {
+  const u = [];
+  return items.forEach((it) => {
+    const m = menuById(it.id);
+    if (m) for (let k = 0; k < it.qty; k++) u.push({ key: it.id + "#" + k, nama: m.nama, harga: m.harga });
+  }), u;
+}
+function hitungPatungan(total, b, items) {
+  if (b.mode === "rata") return { per: bagiPatungan(total, b.orang).map((v) => ({ total: v, isi: [] })), belum: 0, sisa: 0 };
+  const per = Array.from({ length: b.orang }, () => ({ total: 0, isi: [] }));
+  let belum = 0, sisa = 0;
+  return unitPatungan(items || S.cart.items).forEach((u) => {
+    const o = (b.milik || {})[u.key];
+    o != null && o < b.orang ? (per[o].total += u.harga, per[o].isi.push(u.nama)) : (belum++, sisa += u.harga);
+  }), { per, belum, sisa };
+}
 function bagiPatungan(total, orang) {
   const dasar = Math.floor(total / orang / 500) * 500, arr = Array(orang).fill(dasar);
   return arr[0] += total - dasar * orang, arr;
 }
 function validasi(metode, total, dibayar, c) {
   const a = [];
-  return total <= 0 && a.push("Keranjang kosong"), metode === "tunai" && (dibayar < total ? a.push("Masukkan uang yang diterima") : dibayar > total && !c.disebut && a.push("Centang: kembalian sudah disebut")), metode === "qris" && !(c.toko && c.nominal && c.berhasil) && a.push("Selesaikan 3 cek QRIS"), metode === "patungan" && !c.patungan && a.push("Centang: semua bagian sudah dibayar"), a;
+  return total <= 0 && a.push("Keranjang kosong"), metode === "tunai" && (dibayar < total ? a.push("Masukkan uang yang diterima") : dibayar > total && !c.disebut && a.push("Centang: kembalian sudah disebut")), metode === "qris" && !(c.toko && c.nominal && c.berhasil) && a.push("Selesaikan 3 cek QRIS"), metode === "patungan" && c.belum > 0 && a.push("Pilih pemesan untuk ".concat(c.belum, " menu lagi")), metode === "patungan" && !c.patungan && a.push("Centang: semua bagian sudah dibayar"), a;
 }
 const isRamai = (jam, jadwal) => jadwal.some(([a, b]) => jam >= a && jam < b), lunas = (arr) => arr.filter((t) => t.status === "lunas");
 function ringkasHari(txs, tanggal) {
@@ -503,6 +543,7 @@ function resiTeks(t, set, salinan) {
     g,
     kn("TOTAL", rpPlain(t.total)),
     kn(t.metode === "tunai" ? "Tunai" : t.metode === "qris" ? "QRIS" : "Patungan", rpPlain(t.dibayar)),
+    ...t.patungan ? t.patungan.map((x) => kn("  Orang ".concat(x.orang), rpPlain(x.total))) : [],
     ...t.kembalian ? [kn("Kembali", rpPlain(t.kembalian))] : [],
     ...t.catatan ? [g, ("Catatan: " + t.catatan).slice(0, 32)] : [],
     ...t.status === "batal" ? [g, tg("*** DIBATALKAN ***")] : [],
@@ -510,68 +551,62 @@ function resiTeks(t, set, salinan) {
     tg(set.kakiResi || "Terima kasih")
   ].join("\n");
 }
-const ringkasIsi = (t) => t.items.map((i) => i.qty > 1 ? "".concat(i.nama, " \xD7 ").concat(i.qty) : i.nama).join(" + "), KATEGORI = [["lauk", "Lauk Utama"], ["pendamping", "Pendamping"], ["paket", "Paket"], ["nasi", "Nasi"], ["minuman", "Minuman"]], TONE = { lauk: ["#FFC994", "#FF9A8F", "#F5B0CC", "#D4BDF3"], pendamping: ["#FFE3C8"], paket: ["#E6D8F5"], nasi: ["#FFF4E8"], minuman: ["#FCE1EC"] }, JENIS = { makan: "Makan sini", bungkus: "Bungkus", nasibox: "Nasi box" }, MENU0 = [
-  ["rendang", "Rendang Daging", "lauk", 22e3, 11e3],
-  ["ayam-pop", "Ayam Pop", "lauk", 18e3, 9e3],
-  ["ayam-gulai", "Ayam Gulai", "lauk", 18e3, 12e3],
-  ["ayam-bakar", "Ayam Bakar", "lauk", 2e4, 1e4],
-  ["dendeng", "Dendeng Balado", "lauk", 22e3, 11e3],
-  ["tunjang", "Gulai Tunjang", "lauk", 2e4, 1e4],
-  ["paru", "Paru Goreng", "lauk", 15e3, 9e3],
-  ["otak", "Gulai Otak", "lauk", 15e3, 1e4],
-  ["telur-balado", "Telur Balado", "pendamping", 8e3, 4e3],
-  ["perkedel", "Perkedel Kentang", "pendamping", 5e3, 2500],
-  ["daun-singkong", "Gulai Daun Singkong", "pendamping", 4e3, 1500],
-  ["sambal-ijo", "Sambal Ijo (tambah)", "pendamping", 3e3, 1e3],
-  ["paket-pop", "Paket Ayam Pop", "paket", 28e3, 13e3],
-  ["paket-rendang", "Paket Rendang", "paket", 32e3, 15e3],
-  ["paket-hemat", "Paket Hemat Telur", "paket", 15e3, 7e3],
-  ["nasi", "Nasi Putih", "nasi", 6e3, 2e3],
-  ["es-teh", "Es Teh Manis", "minuman", 5e3, 1500],
-  ["teh-tawar", "Teh Tawar", "minuman", 3e3, 800],
-  ["es-jeruk", "Es Jeruk", "minuman", 7e3, 3e3],
-  ["air", "Air Mineral", "minuman", 4e3, 2500],
-  ["kopi", "Kopi Hitam", "minuman", 5e3, 2e3]
-].map(([id, nama, kat, harga, modal]) => ({ id, nama, kat, harga, modal, aktif: !0, diubah: null })), BAHAN0 = [
-  ["ayam", "Ayam", 34e3, "kg", 8, "potong"],
-  ["daging", "Daging sapi", 13e4, "kg", 12, "potong"],
-  ["tunjang", "Tunjang (kikil)", 6e4, "kg", 8, "potong"],
-  ["paru", "Paru sapi", 7e4, "kg", 10, "potong"],
-  ["otak", "Otak sapi", 9e4, "kg", 10, "potong"],
-  ["beras", "Beras", 14e3, "kg", 8, "porsi"],
-  ["telur", "Telur", 3e4, "kg", 16, "butir"],
-  ["kentang", "Kentang", 18e3, "kg", 10, "perkedel"],
-  ["singkong", "Daun singkong", 5e3, "ikat", 6, "porsi"],
-  ["cabai", "Cabai hijau", 4e4, "kg", 40, "porsi"],
-  ["teh", "Teh celup", 1e4, "kotak", 50, "gelas"],
-  ["gula", "Gula pasir", 18e3, "kg", 50, "gelas"],
-  ["es", "Es batu", 5e3, "bal", 25, "gelas"],
-  ["jeruk", "Jeruk peras", 2e4, "kg", 8, "gelas"],
-  ["kopi", "Kopi bubuk", 15e3, "bungkus", 30, "gelas"],
-  ["air", "Air mineral", 48e3, "dus", 24, "botol"]
+const ringkasIsi = (t) => t.items.map((i) => i.qty > 1 ? "".concat(i.nama, " \xD7 ").concat(i.qty) : i.nama).join(" + "), KATEGORI = [["lauk", "Menu Utama"], ["paket", "Paket Hemat"], ["tambahan", "Tambahan"], ["minuman", "Minuman"]], TONE = { lauk: ["#FFC994", "#FF9A8F", "#F5B0CC", "#D4BDF3"], paket: ["#E6D8F5"], tambahan: ["#FFE3C8"], minuman: ["#FCE1EC"] }, JENIS = { makan: "Makan sini", bungkus: "Bungkus", nasibox: "Nasi box" }, MENU0 = [
+  ["tunjang", "Tunjang", "lauk", 3e4, 25e3],
+  ["ikan-bakar", "Ikan Bakar", "lauk", 18e3, 12e3],
+  ["bawal", "Ikan Bawal", "lauk", 18e3, 12e3],
+  ["kembung", "Ikan Kembung", "lauk", 18e3, 12e3],
+  ["tongkol", "Ikan Tongkol", "lauk", 18e3, 12e3],
+  ["lele", "Ikan Lele", "lauk", 15e3, 1e4],
+  ["ayam-bakar", "Ayam Bakar", "lauk", 19e3, 15e3],
+  ["ayam-goreng", "Ayam Goreng", "lauk", 19e3, 15e3],
+  ["ayam-gulai", "Ayam Gulai", "lauk", 19e3, 15e3],
+  ["rendang", "Rendang", "lauk", 18e3, 13e3],
+  ["cincang", "Cincang", "lauk", 18e3, 13e3],
+  ["dendeng", "Dendeng", "lauk", 2e4, 15e3],
+  ["telur-bulat", "Telur Bulat", "lauk", 12e3, 7e3],
+  ["telur-dadar", "Telur Dadar", "lauk", 13e3, 7e3],
+  ["usus", "Usus", "lauk", 2e4, 15e3],
+  ["ati", "Ati Ampela", "lauk", 13e3, 7e3],
+  ["hemat-bakar", "Paket Hemat Ayam Bakar", "paket", 13e3, 1e4],
+  ["hemat-goreng", "Paket Hemat Ayam Goreng", "paket", 13e3, 1e4],
+  ["hemat-gulai", "Paket Hemat Ayam Gulai", "paket", 13e3, 1e4],
+  ["perkedel", "Perkedel", "tambahan", 3e3],
+  ["tempe-balado", "Tempe Balado", "tambahan", 3e3],
+  ["kerupuk-kulit", "Kerupuk Kulit", "tambahan", 3e3],
+  ["dorokdok", "Dorokdok", "tambahan", 2500],
+  ["telur-balado", "Telur Bulat Balado", "tambahan", 5e3],
+  ["peyek", "Peyek Udang", "tambahan", 7e3],
+  ["kerupuk-putih", "Kerupuk Putih", "tambahan", 2500],
+  ["sayur-kuah", "Sayur Kuah", "tambahan", 5e3],
+  ["nutrisari", "Nutrisari", "minuman", 5e3],
+  ["air", "Air Mineral", "minuman", 5e3],
+  ["teh-pucuk", "Teh Pucuk", "minuman", 6e3],
+  ["susu", "Susu", "minuman", 8e3],
+  ["teh-botol", "Teh Botol", "minuman", 7e3],
+  ["kopi", "Kopi Hitam", "minuman", 5e3]
+].map(([id, nama, kat, harga, tn]) => Object.assign({ id, nama, kat, harga, modal: 0, aktif: !0, diubah: null }, tn ? { nasi: !0, hargaTanpa: tn } : {})), BAHAN0 = [
+  ["ayam", "Ayam", 33e3, "ekor", 8, "potong"],
+  ["ikan-bakar", "Ikan bakar", 45e3, "kg", 4, "ekor"],
+  ["bawal", "Ikan bawal", 45e3, "kg", 4, "ekor"],
+  ["kembung", "Ikan kembung", 45e3, "kg", 4, "ekor"],
+  ["tongkol", "Ikan tongkol", 45e3, "kg", 4, "ekor"],
+  ["lele", "Ikan lele", 29e3, "kg", 7, "ekor"],
+  ["tunjang", "Tunjang", 16e4, "beli", 14, "potong"],
+  ["daging", "Daging rendang/dendeng", 14e4, "kg", 25, "potong"],
+  ["cincang", "Cincang", 7e4, "kg", 15, "porsi"],
+  ["usus", "Usus", 6e4, "kg", 5.5, "porsi"],
+  ["telur", "Telur", 16500, "kg", 16, "butir"],
+  ["ati", "Ati ampela", 25e3, "10 pasang", 10, "pasang"],
+  ["kentang", "Kentang", 25500, "1,5 kg", 30, "perkedel"],
+  ["beras", "Beras", 635e3, "47 kg", 470, "porsi nasi"]
 ].map(([id, nama, harga, satuan, isi, unit]) => ({ id, nama, harga, satuan, isi, unit })), RESEP0 = {
-  rendang: [["daging", 1]],
-  "ayam-pop": [["ayam", 1]],
-  "ayam-gulai": [["ayam", 1]],
-  "ayam-bakar": [["ayam", 1]],
-  dendeng: [["daging", 1]],
-  tunjang: [["tunjang", 1]],
-  paru: [["paru", 1]],
-  otak: [["otak", 1]],
-  "telur-balado": [["telur", 1]],
-  perkedel: [["kentang", 1]],
-  "daun-singkong": [["singkong", 1]],
-  "sambal-ijo": [["cabai", 1]],
-  "paket-pop": [["beras", 1], ["ayam", 1], ["teh", 1], ["gula", 1], ["es", 1]],
-  "paket-rendang": [["beras", 1], ["daging", 1], ["singkong", 1]],
-  "paket-hemat": [["beras", 1], ["telur", 1], ["singkong", 1]],
-  nasi: [["beras", 1]],
-  "es-teh": [["teh", 1], ["gula", 1], ["es", 1]],
-  "teh-tawar": [["teh", 1]],
-  "es-jeruk": [["jeruk", 1], ["gula", 1], ["es", 1]],
-  air: [["air", 1]],
-  kopi: [["kopi", 1], ["gula", 1]]
-}, OVERHEAD0 = [["Bumbu & rempah", 18e4], ["Santan & minyak goreng", 9e4], ["Gas LPG", 45e3], ["Listrik & air", 25e3]].map(([nama, perHari]) => ({ id: nama.toLowerCase().replace(/[^a-z]+/g, "-"), nama, perHari })), KAT_MASAKAN = ["lauk", "pendamping", "paket"], SET0 = {
+  tunjang: [["tunjang", 1]], "ikan-bakar": [["ikan-bakar", 1]], bawal: [["bawal", 1]], kembung: [["kembung", 1]], tongkol: [["tongkol", 1]], lele: [["lele", 1]],
+  "ayam-bakar": [["ayam", 1]], "ayam-goreng": [["ayam", 1]], "ayam-gulai": [["ayam", 1]], rendang: [["daging", 1]], cincang: [["cincang", 1]], dendeng: [["daging", 1]],
+  "telur-bulat": [["telur", 1]], "telur-dadar": [["telur", 1]], usus: [["usus", 1]], ati: [["ati", 1]],
+  "hemat-bakar": [["ayam", 1]], "hemat-goreng": [["ayam", 1]], "hemat-gulai": [["ayam", 1]],
+  perkedel: [["kentang", 1]], "telur-balado": [["telur", 1]]
+}, OVERHEAD0 = [["Cabai giling", 3e4], ["Bawang merah", 33229], ["Laos & jahe", 3572], ["Nangka", 2e4], ["Daun singkong", 3e4], ["Tahu", 18e3], ["Minyak, santan & bumbu lain", 0], ["Gas LPG", 1e4], ["Listrik", 29167], ["Administrasi", 2e3]].map(([nama, perHari]) => ({ id: nama.toLowerCase().replace(/[^a-z]+/g, "-"), nama, perHari })), KAT_MASAKAN = ["lauk", "paket"], MENU_LAMA_ID = ["rendang", "ayam-pop", "ayam-gulai", "ayam-bakar", "dendeng", "tunjang", "paru", "otak", "telur-balado", "perkedel", "daun-singkong", "sambal-ijo", "paket-pop", "paket-rendang", "paket-hemat", "nasi", "es-teh", "teh-tawar", "es-jeruk", "air", "kopi"], SET0 = {
   namaToko: "RM. Padang Putraguci",
   alamat: "",
   wa: "",
@@ -583,13 +618,135 @@ const ringkasIsi = (t) => t.items.map((i) => i.qty > 1 ? "".concat(i.nama, " \xD
   ramai: [[12, 14], [18, 20]],
   ambang: 0.1,
   potong: 8,
-  ayamPatokan: 34e3,
+  ayamPatokan: 33e3,
   porsiHari: 0,
   lastBackup: null,
   kakiResi: "Terima kasih, salamaik makan!",
   pin: "1234"
 };
 let idb = null;
+/* ===== Sinkron database toko (Firebase). Bila tidak aktif, semua tetap di IndexedDB HP ini. ===== */
+const CL = { on: false, api: null, kode: null, siap: false, kotor: new Set(), pending: 0, err: null, awal: {}, awalServer: false,
+  m: { meta: new Map(), menu: new Map(), tx: new Map(), keluar: new Map(), hari: new Map() } };
+const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} },
+  jsonOf = (v) => JSON.stringify(v === void 0 ? null : v),
+  kunciDari = (n, v) => n === "hari" ? v.tanggal : n === "meta" ? v.k : v.id;
+function cloudTulis(ops) {
+  if (!ops.length) return Promise.resolve(!0);
+  CL.pending++, renderSync();
+  return CL.api.tulis(CL.kode, ops).then(() => (CL.err = null, !0)).catch((e) => {
+    CL.err = e, toast("Gagal sinkron ke database: " + (e && (e.code || e.message)));
+    return !1;
+  }).finally(() => { CL.pending--, renderSync(); });
+}
+function cloudPut(n, arr) {
+  const ops = [];
+  arr.forEach((v) => {
+    if (n === "meta") {
+      const j = jsonOf(v.v);
+      if (CL.m.meta.get(v.k) === j) return;
+      CL.m.meta.set(v.k, j), ops.push({ c: "meta", id: v.k, j });
+    } else if (n === "tx") {
+      const j = jsonOf(v), o = CL.m.tx.get(v.id);
+      if (o && o.j === j) return;
+      o && o.tanggal !== v.tanggal && ops.push({ c: "txd", id: o.tanggal, f: v.id, del: !0 });
+      CL.m.tx.set(v.id, { tanggal: v.tanggal, j }), ops.push({ c: "txd", id: v.tanggal, f: v.id, j });
+    } else {
+      const id = String(kunciDari(n, v)), j = jsonOf(v);
+      if (CL.m[n].get(id) === j) return;
+      CL.m[n].set(id, j), ops.push({ c: n, id, j });
+    }
+  });
+  return cloudTulis(ops);
+}
+function cloudDel(n, keys) {
+  const ops = [];
+  keys.forEach((k) => {
+    k = String(k);
+    if (n === "tx") {
+      const o = CL.m.tx.get(k);
+      o && (CL.m.tx.delete(k), ops.push({ c: "txd", id: o.tanggal, f: k, del: !0 }));
+    } else CL.m[n].has(k) && (CL.m[n].delete(k), ops.push({ c: n, id: k, del: !0 }));
+  });
+  return cloudTulis(ops);
+}
+function cloudMenu(menu) {
+  const ops = [], ada = new Set();
+  (menu || []).forEach((m, i) => {
+    ada.add(m.id);
+    const j = jsonOf(Object.assign({}, m, { urut: i }));
+    CL.m.menu.get(m.id) !== j && (CL.m.menu.set(m.id, j), ops.push({ c: "menu", id: m.id, j }));
+  });
+  [...CL.m.menu.keys()].forEach((id) => { ada.has(id) || (CL.m.menu.delete(id), ops.push({ c: "menu", id, del: !0 })); });
+  return cloudTulis(ops);
+}
+function cloudAll(n) {
+  const P = (j) => JSON.parse(j), urut = (a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
+  if (n === "meta") {
+    const r = [...CL.m.meta.entries()].filter(([k]) => k !== "menu").map(([k, j]) => ({ k, v: P(j) }));
+    CL.m.menu.size && r.push({ k: "menu", v: cloudAll("menu").sort((a, b) => (a.urut || 0) - (b.urut || 0)).map((m) => (delete m.urut, m)) });
+    return r;
+  }
+  if (n === "tx") return [...CL.m.tx.entries()].sort(urut).map(([, o]) => P(o.j));
+  return [...CL.m[n].entries()].sort(urut).map(([, j]) => P(j));
+}
+/* Terima perubahan dari HP lain (atau dari cache saat dibuka). */
+function terimaCloud(c, changes, fromCache) {
+  let ubah = !1;
+  changes.forEach(({ type, id, data }) => {
+    if (c === "txd") {
+      const isi = type === "removed" ? {} : data.t || {};
+      CL.m.tx.forEach((o, tid) => { o.tanggal === id && !(tid in isi) && (CL.m.tx.delete(tid), ubah = !0); });
+      Object.entries(isi).forEach(([tid, j]) => {
+        const o = CL.m.tx.get(tid);
+        (!o || o.j !== j) && (CL.m.tx.set(tid, { tanggal: id, j }), ubah = !0);
+      });
+    } else {
+      const map = CL.m[c];
+      type === "removed" ? map.has(id) && (map.delete(id), ubah = !0) : map.get(id) !== data.j && (map.set(id, data.j), ubah = !0);
+    }
+  });
+  CL.awal[c] = !0, c === "meta" && !fromCache && (CL.awalServer = !0);
+  if (ubah) CL.siap ? (terapkanCloud(c), renderNanti()) : CL.kotor.add(c);
+  CL.cekAwal && CL.cekAwal();
+}
+function terapkanCloud(c) {
+  if (c === "txd") {
+    const ids = new Set(S.tx.map((t) => t.id));
+    S.tx = cloudAll("tx");
+    S.lastId && !S.tx.some((t) => t.id === S.lastId) && ids.has(S.lastId) && (S.lastId = null);
+  } else if (c === "keluar") S.keluar = cloudAll("keluar");
+  else if (c === "hari") S.hari = cloudAll("hari");
+  else if (c === "menu") {
+    S.menu = cloudAll("menu").sort((a, b) => (a.urut || 0) - (b.urut || 0)).map((m) => (delete m.urut, m)), perbaruiModal();
+    S.cart.items = S.cart.items.filter((i) => menuById(i.id));
+  } else if (c === "meta") {
+    const g = (k) => CL.m.meta.has(k) ? JSON.parse(CL.m.meta.get(k)) : void 0, st = g("set");
+    st && (S.set = __spreadValues(__spreadValues({}, SET0), st));
+    g("bahan") && (S.bahan = g("bahan")), g("overhead") && (S.overhead = g("overhead")), g("hargaAyam") && (S.hargaAyam = g("hargaAyam"));
+    g("aktif") && (S.aktif = g("aktif")), S.contoh = !!g("contoh"), perbaruiModal();
+  }
+}
+let renderT = null;
+function renderNanti() {
+  clearTimeout(renderT), renderT = setTimeout(() => {
+    const a = document.activeElement;
+    if (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && $("#view").contains(a)) {
+      a.addEventListener("blur", renderNanti, { once: !0 });
+      return;
+    }
+    render();
+  }, 150);
+}
+function renderSync() {
+  CL.siap && renderHeader();
+}
+function chipSync() {
+  if (!CL.on) return "";
+  const t = !navigator.onLine ? ["warn", "○", "Offline \xB7 dikirim saat ada sinyal", "Offline"] : CL.err ? ["warn", "!", "Gagal sinkron", "Gagal"] : CL.pending ? ["info", "↻", "Menyinkron…", "Sinkron"] : ["mute", "✓", "Tersinkron", ""];
+  return '<button class="chip '.concat(t[0], '" data-a="profilTab" data-v="data" title="Database toko ').concat(esc(CL.kode), '">').concat(t[1], ' <span class="hide-m">').concat(t[2], '</span>').concat(t[3] ? '<span class="sr">' + t[3] + "</span>" : "", "</button>");
+}
 function openDB() {
   return new Promise((res) => {
     try {
@@ -604,11 +761,13 @@ function openDB() {
   });
 }
 const store = (n, m) => idb.transaction(n, m).objectStore(n), dbAll = (n) => new Promise((res) => {
+  if (CL.on) return res(cloudAll(n));
   if (!idb) return res([]);
   const q = store(n, "readonly").getAll();
   q.onsuccess = () => res(q.result || []), q.onerror = () => res([]);
 });
 function dbPutMany(n, arr) {
+  if (CL.on) return cloudPut(n, arr), Promise.resolve(!0);
   return new Promise((res) => {
     if (!idb || !arr.length) return res(!0);
     const t = idb.transaction(n, "readwrite"), s = t.objectStore(n);
@@ -619,13 +778,14 @@ function dbPutMany(n, arr) {
 }
 const dbPut = (n, v) => dbPutMany(n, [v]);
 function dbDelMany(n, keys) {
+  if (CL.on) return cloudDel(n, keys), Promise.resolve();
   return new Promise((res) => {
     if (!idb || !keys.length) return res();
     const t = idb.transaction(n, "readwrite"), s = t.objectStore(n);
     keys.forEach((k) => s.delete(k)), t.oncomplete = () => res(), t.onerror = () => res();
   });
 }
-const saveMeta = (k, v) => dbPut("meta", { k, v }), S = {
+const saveMeta = (k, v) => CL.on && k === "menu" ? (cloudMenu(v), Promise.resolve(!0)) : dbPut("meta", { k, v }), S = {
   menu: [],
   tx: [],
   keluar: [],
@@ -638,7 +798,7 @@ const saveMeta = (k, v) => dbPut("meta", { k, v }), S = {
   kat: "lauk",
   cari: "",
   cart: { items: [], jenis: "makan", meja: "", catatan: "" },
-  bayar: { metode: "tunai", input: "", cek: {}, orang: 2 },
+  bayar: { metode: "tunai", input: "", cek: {}, orang: 2, mode: "pesanan", milik: {} },
   resiId: null,
   lastId: null,
   rw: { tgl: null, metode: "semua", cari: "", sel: null },
@@ -655,13 +815,13 @@ function rng(seed) {
   };
 }
 function buatContoh() {
-  const r = rng(47), now = jkt(), today = now.tanggal, M = (id) => S.menu.find((m) => m.id === id), pick = (arr) => {
+  const r = rng(47), now = jkt(), today = now.tanggal, M = menuById, pick = (arr) => {
     const tot = arr.reduce((s, x) => s + x[1], 0);
     let v = r() * tot;
     for (const [id, w] of arr)
       if (v -= w, v <= 0) return id;
     return arr[0][0];
-  }, LAUK = [["ayam-pop", 30], ["rendang", 26], ["ayam-bakar", 20], ["ayam-gulai", 13], ["tunjang", 11], ["dendeng", 8], ["paru", 6], ["otak", 3]], PEND = [["telur-balado", 5], ["perkedel", 6], ["daun-singkong", 4], ["sambal-ijo", 2]], MIN = [["es-teh", 10], ["teh-tawar", 5], ["es-jeruk", 4], ["air", 4], ["kopi", 2]], PAK = [["paket-pop", 5], ["paket-rendang", 3], ["paket-hemat", 3]], W = { 10: 0.05, 11: 0.08, 12: 0.18, 13: 0.16, 14: 0.07, 15: 0.04, 16: 0.04, 17: 0.06, 18: 0.13, 19: 0.12, 20: 0.07 }, txs = [], kel = [], hari = [];
+  }, LAUK = [["ayam-goreng", 28], ["rendang", 22], ["ayam-bakar", 20], ["ayam-gulai", 13], ["ikan-bakar", 10], ["lele", 9], ["dendeng", 8], ["telur-dadar", 8], ["tunjang", 6], ["cincang", 6], ["telur-bulat", 6], ["kembung", 5], ["tongkol", 5], ["bawal", 4], ["usus", 4], ["ati", 4]], PEND = [["perkedel", 6], ["kerupuk-kulit", 5], ["tempe-balado", 4], ["sayur-kuah", 3], ["peyek", 3], ["kerupuk-putih", 3], ["telur-balado", 3], ["dorokdok", 2]], MIN = [["air", 8], ["teh-pucuk", 6], ["teh-botol", 5], ["nutrisari", 4], ["kopi", 3], ["susu", 2]], PAK = [["hemat-goreng", 5], ["hemat-bakar", 4], ["hemat-gulai", 3]], W = { 10: 0.05, 11: 0.08, 12: 0.18, 13: 0.16, 14: 0.07, 15: 0.04, 16: 0.04, 17: 0.06, 18: 0.13, 19: 0.12, 20: 0.07 }, txs = [], kel = [], hari = [];
   for (let back = 30; back >= 0; back--) {
     const d = addDays(today, -back), w = dow(d), f = (w === 0 || w === 6 ? 1.25 : 1) * (0.85 + r() * 0.3);
     let no = 0;
@@ -673,11 +833,10 @@ function buatContoh() {
         if (r() < 0.3) add(pick(PAK), r() < 0.2 ? 2 : 1);
         else {
           const orang = r() < 0.7 ? 1 : 2;
-          add("nasi", orang);
-          for (let o = 0; o < orang; o++) add(pick(LAUK));
+                    for (let o = 0; o < orang; o++) add(pick(LAUK) + (r() < 0.15 ? TN : ""));
           r() < 0.45 && add(pick(PEND));
         }
-        r() < 0.6 && add(pick(MIN), r() < 0.3 ? 2 : 1), r() < 0.03 && (add("nasi", 8), add("ayam-pop", 8));
+        r() < 0.6 && add(pick(MIN), r() < 0.3 ? 2 : 1), r() < 0.03 && (add("hemat-goreng", 8));
         const its = [...items].map(([id, qty]) => {
           const m = M(id);
           return { menuId: id, nama: m.nama, harga: m.harga, modal: m.modal, qty };
@@ -716,7 +875,7 @@ function buatContoh() {
 const hariIni = () => {
   var _a;
   return ((_a = S.aktif) == null ? void 0 : _a.tanggal) || jkt().tanggal;
-}, nomorBerikut = () => "A-".concat(String(S.tx.filter((t) => t.tanggal === hariIni()).length + 1).padStart(3, "0"));
+}, nomorBerikut = () => { const h = S.tx.filter((t) => t.tanggal === hariIni()), mx = h.reduce((a, t) => Math.max(a, parseInt(String(t.nomor || "").replace(/\D/g, ""), 10) || 0), 0); return "A-".concat(String(Math.max(h.length, mx) + 1).padStart(3, "0")); };
 async function tutupHariOtomatis(tanggal) {
   var _a, _b, _c;
   const ada = S.hari.find((h) => h.tanggal === tanggal);
@@ -765,8 +924,8 @@ function rincianModal(m) {
   const rows = (m.resep || []).map((r) => {
     const b = bahanById(r.bahanId);
     return { b, qty: r.qty, nilai: Math.round(hargaUnit(b) * r.qty) };
-  }).filter((r) => r.b), bahan = rows.reduce((s, r) => s + r.nilai, 0), oh = KAT_MASAKAN.includes(m.kat) && rows.length ? overheadPorsi() : 0;
-  return { rows, bahan, oh, total: bahan + oh, otomatis: rows.length > 0 };
+  }).filter((r) => r.b), bahan = rows.reduce((s, r) => s + r.nilai, 0), oh = KAT_MASAKAN.includes(m.kat) && rows.length ? overheadPorsi() : 0, nasi = m.nasi && rows.length ? modalNasi() : 0;
+  return { rows, bahan, nasi, oh, total: bahan + nasi + oh, otomatis: rows.length > 0 };
 }
 function perbaruiModal() {
   S.menu.forEach((m) => {
@@ -797,7 +956,13 @@ function go(v) {
   }
   render();
 }
-const menuById = (id) => S.menu.find((m) => m.id === id), cartTotal = () => S.cart.items.reduce((s, i) => {
+const TN = "~tn", modalNasi = () => Math.round(hargaUnit(bahanById("beras"))), menuById = (id) => {
+  if (typeof id === "string" && id.endsWith(TN)) {
+    const m = S.menu.find((x) => x.id === id.slice(0, -TN.length));
+    return m && m.nasi ? Object.assign({}, m, { id, baseId: m.id, nama: m.nama + " (tanpa nasi)", harga: m.hargaTanpa || 0, modal: Math.max(0, (m.modal || 0) - modalNasi()), tanpaNasi: !0 }) : void 0;
+  }
+  return S.menu.find((m) => m.id === id);
+}, cartTotal = () => S.cart.items.reduce((s, i) => {
   const m = menuById(i.id);
   return s + (m ? m.harga * i.qty : 0);
 }, 0), cartQty = () => S.cart.items.reduce((s, i) => s + i.qty, 0), inisial = (n) => n.split(/\s+/).filter((w) => /[A-Za-z]/.test(w[0])).slice(0, 2).map((w) => w[0]).join("").toUpperCase(), tone = () => "var(--peach-t)";
@@ -809,7 +974,7 @@ function terlarisIds() {
   }).slice(0, 3).map((r) => r.menuId));
 }
 function resetBayar() {
-  S.bayar = { metode: "tunai", input: "", cek: {}, orang: 2 };
+  S.bayar = { metode: "tunai", input: "", cek: {}, orang: 2, mode: "pesanan", milik: {} };
 }
 const narrow = (w) => window.matchMedia("(max-width:".concat(w, "px)")).matches, metodeLabel = (m) => m === "tunai" ? "Tunai" : m === "qris" ? "QRIS" : "Patungan", ICON = {
   kasir: '<path d="M4 7h16M4 12h16M4 17h10"/>',
@@ -823,6 +988,7 @@ function renderHeader() {
   var _a;
   const j = jkt(), ramai = isRamai(j.jam, S.set.ramai), tabOn = S.view === "bayar" || S.view === "resi" ? "kasir" : S.view;
   $("#hdr").innerHTML = '\n    <button class="logo '.concat(S.view === "profil" ? "on" : "", '" data-a="go" data-v="profil" aria-label="Profil toko dan pengaturan">PG</button>\n    <span class="title-m">').concat(JUDUL[S.view] || "", '</span>\n    <nav class="tabs" aria-label="Menu utama">').concat(TABS.map(([v, l]) => '<button class="tab '.concat(tabOn === v ? "on" : "", '" data-a="go" data-v="').concat(v, '" ').concat(tabOn === v ? 'aria-current="page"' : "", ">").concat(l, "</button>")).join(""), '</nav>\n    <div class="hdr-r">\n      ').concat((() => {
+    if (CL.on) return chipSync();
     if (!S.tx.some((t) => !t.contoh)) return "";
     const lb = S.set.lastBackup, hr = lb ? Math.floor((noon(hariIni()) - noon(lb.slice(0, 10))) / 864e5) : null;
     return hr == null || hr >= 3 ? '<button class="chip warn" data-a="profilTab" data-v="data" title="Data hanya ada di tablet ini">! <span class="hide-m">'.concat(hr == null ? "Belum pernah dicadangkan" : "Cadangan ".concat(hr, " hari lalu"), '</span><span class="sr">cadangan</span></button>') : "";
@@ -856,11 +1022,30 @@ function render() {
       }
   }
 }
+function vBahan() {
+  const P = porsiMasakanHarian(), oh = overheadPorsi(), ay = bahanById("ayam"), br = bahanById("beras"), fi = (b, k, w, t, x) => '<input id="b'.concat(k[0], "-").concat(b.id, '" class="inp').concat(t === "number" ? " num r" : "", '" style="min-height:40px;font-size:14px;width:').concat(w, '" ').concat(t === "number" ? 'type="number" inputmode="decimal" min="0" step="any"' : "", ' data-i="bahan" data-id="').concat(b.id, '" data-k="').concat(k, '" value="').concat(esc(b[k]), '" aria-label="').concat(x, " ").concat(esc(b.nama), '">');
+  const contoh = ay ? "".concat(esc(ay.nama), " ").concat(rp(ay.harga), " per ").concat(esc(ay.satuan), " jadi ").concat(ay.isi, " ").concat(esc(ay.unit), " \u2192 ").concat(rp(Math.round(hargaUnit(ay))), " per ").concat(esc(ay.unit)) : "Ayam Rp33.000 per ekor jadi 8 potong \u2192 Rp4.125 per potong";
+  const menuRows = S.menu.filter((m) => m.aktif && KAT_MASAKAN.includes(m.kat)).map((m) => {
+    const r = rincianModal(m), u = m.harga - m.modal;
+    return '<tr><td>'.concat(esc(m.nama), '</td><td class="r num">').concat(rp(m.harga), '</td><td class="r num">').concat(rp(r.bahan), '</td><td class="r num">').concat(r.nasi ? rp(r.nasi) : "\u2013", '</td><td class="r num">').concat(rp(r.oh), '</td><td class="r num"><b>').concat(rp(m.modal), '</b></td><td class="r num" style="color:').concat(u < 0 ? "var(--coral-x)" : "inherit", '">').concat(rp(u), "</td></tr>");
+  }).join("");
+  return '<h2>Modal (HPP) per porsi</h2>\n    <div class="note brief"><b>Cara hitungnya, cukup 3 hal:</b><ol>\n      <li><b>Lauk</b> \u2014 isi uang belanja dan jadi berapa porsi. Aplikasi yang membagi.<br><span class="small">Contoh: '.concat(contoh, '.</span></li>\n      <li><b>Nasi</b> \u2014 ').concat(br ? "beras ".concat(rp(br.harga), " jadi ").concat(br.isi, " porsi \u2192 ").concat(rp(modalNasi()), " per porsi") : "isi bahan Beras", ', ditambahkan hanya ke harga <i>pakai nasi</i>.</li>\n      <li><b>Biaya bersama</b> \u2014 bumbu, sayur, gas, listrik per hari, dibagi jumlah porsi terjual per hari (sekarang ').concat(rp(oh), ' per porsi).</li></ol>\n      <b>Modal 1 porsi = lauk + nasi + biaya bersama.</b> Harga pasar naik? Cukup ganti angka belanjanya, modal semua menu ikut berubah.</div>\n    <div class="ph"><h3>1. Belanja lauk &amp; nasi</h3><button class="btn sm pri" data-a="tambahBahan">+ Tambah bahan</button></div>\n    <div class="blist">').concat(S.bahan.map((b) => '<div class="brow">\n      '.concat(fi(b, "nama", "100%", "text", "Nama bahan"), '\n      <div class="bsent"><span>Beli</span>').concat(fi(b, "harga", "92px", "number", "Harga beli"), "<span>per</span>").concat(fi(b, "satuan", "76px", "text", "Satuan beli"), "<span>jadi</span>").concat(fi(b, "isi", "56px", "number", "Jadi berapa"), fi(b, "unit", "90px", "text", "Satuan pakai"), '</div>\n      <div class="bres"><span class="small muted">= per ').concat(esc(b.unit), '</span><b id="bpu-').concat(b.id, '" class="num">').concat(rp(Math.round(hargaUnit(b))), '</b><button class="linkbtn" data-a="hapusBahan" data-id="').concat(b.id, '" aria-label="Hapus ').concat(esc(b.nama), '">hapus</button></div></div>')).join(""), '</div>\n    <div class="ph" style="margin-top:var(--s3)"><h3>2. Biaya bersama per hari</h3><button class="btn sm" data-a="tambahOverhead">+ Tambah biaya</button></div>\n    <p class="small muted" style="margin:0">Yang dipakai bersama untuk semua lauk. Isi perkiraan per hari (mis. gas Rp20.000 habis 2 hari = Rp10.000). Gaji tidak dimasukkan di sini.</p>\n    <table class="data"><tbody>').concat(S.overhead.map((o) => '<tr><td><input id="on-'.concat(o.id, '" class="inp" style="min-height:40px;font-size:14px;width:100%" data-i="overhead" data-id="').concat(o.id, '" data-k="nama" value="').concat(esc(o.nama), '" aria-label="Nama biaya"></td><td class="r"><input id="op-').concat(o.id, '" class="inp num r" style="min-height:40px;font-size:14px;width:120px" type="number" step="1000" min="0" data-i="overhead" data-id="').concat(o.id, '" data-k="perHari" value="').concat(o.perHari, '" aria-label="Biaya per hari ').concat(esc(o.nama), '"></td><td><button class="linkbtn" data-a="hapusOverhead" data-id="').concat(o.id, '" aria-label="Hapus ').concat(esc(o.nama), '">hapus</button></td></tr>')).join(""), '</tbody></table>\n    <div class="panel" style="background:var(--bg);gap:var(--s2)">\n      <div class="kv"><span>Total biaya bersama / hari</span><b id="ohTot">').concat(rp(totalOverhead()), '</b></div>\n      <div class="kv"><span>\xF7 Porsi lauk terjual / hari ').concat(P.auto ? "(rata-rata ".concat(P.hari || 0, " hari terakhir)") : "(diisi manual)", "</span><b>").concat(P.n, '</b></div>\n      <label class="field">Isi sendiri porsi per hari (0 = otomatis dari penjualan)<input id="set-porsiHari" type="number" min="0" data-i="porsiHari" value="').concat(S.set.porsiHari, '"></label>\n      <div class="kv" style="font-weight:700;border-top:1px solid var(--line);padding-top:var(--s2)"><span>= Biaya bersama per porsi</span><span id="ohPorsi">').concat(rp(oh), '</span></div>\n    </div>\n    <h3>3. Hasilnya: modal tiap menu</h3>\n    <div style="overflow-x:auto"><table class="data" style="font-size:14px"><thead><tr><th scope="col">Menu</th><th scope="col" class="r">Jual</th><th scope="col" class="r">Lauk</th><th scope="col" class="r">Nasi</th><th scope="col" class="r">Bersama</th><th scope="col" class="r">Modal</th><th scope="col" class="r">Untung</th></tr></thead><tbody>').concat(menuRows, '</tbody></table></div>\n    <p class="small muted" style="margin:0">Angka awal diambil dari catatan modal toko (Nov 2026). Isi per kg ikan, usus, kentang, dan porsi beras masih perkiraan; sesuaikan bila berbeda. Tambahan &amp; minuman: ketuk \u201CIsi modal\u201D di Menu &amp; harga.</p>');
+}
+async function migrasiMenuV2() {
+  const lama = S.menu || [], pakai = new Set(), norm = (x) => String(x || "").toLowerCase().replace(/[^a-z]/g, ""), ALIAS = { rendang: "rendang", dendeng: "dendeng", tunjang: "tunjang", "ayam-bakar": "ayam-bakar", "ayam-gulai": "ayam-gulai", perkedel: "perkedel", "telur-balado": "telur-balado", air: "air", kopi: "kopi" };
+  const baru = MENU0.map((m0) => {
+    const m = Object.assign({}, m0, { resep: (RESEP0[m0.id] || []).map(([bahanId, qty]) => ({ bahanId, qty })) }), o = lama.find((x) => !pakai.has(x.id) && (MENU_LAMA_ID.includes(x.id) ? ALIAS[x.id] === m0.id : norm(x.nama) === norm(m0.nama)));
+    return o && (pakai.add(o.id), o.foto && (m.foto = o.foto, m.diubahFoto = o.diubahFoto)), m;
+  }), sisa = lama.filter((x) => !pakai.has(x.id) && !MENU_LAMA_ID.includes(x.id) && !baru.some((b) => b.id === x.id)).map((x) => Object.assign({}, x, { kat: KATEGORI.some(([k]) => k === x.kat) ? x.kat : "tambahan" }));
+  S.menu = baru.concat(sisa), S.bahan = BAHAN0.map((b) => __spreadValues({}, b)), S.overhead = OVERHEAD0.map((o) => __spreadValues({}, o)), S.set.ayamPatokan = 33e3, S.set.potong = 8, S.kat = "lauk";
+  await saveMeta("bahan", S.bahan), await saveMeta("overhead", S.overhead), await saveMeta("set", S.set), await saveMeta("resepV1", !0), await saveMeta("menuV2", !0);
+}
 function vKasir() {
   var _a;
   const q = S.cari.trim().toLowerCase(), aktif = S.menu.filter((m) => m.aktif), list = q ? aktif.filter((m) => m.nama.toLowerCase().includes(q)) : aktif.filter((m) => m.kat === S.kat), top = terlarisIds(), today = hariIni(), cards = list.map((m) => {
     const inCart = S.cart.items.find((x) => x.id === m.id), tag = m.diubah && m.diubah >= addDays(today, -7) ? '<span class="tag warn">Harga baru</span>' : top.has(m.id) ? '<span class="tag">\u2605 Terlaris</span>' : "";
-    return '<button class="mcard '.concat(inCart ? "on" : "", '" data-a="add" data-id="').concat(m.id, '" title="').concat(esc(m.nama), " \xB7 ").concat(rp(m.harga), '" aria-label="Tambah ').concat(esc(m.nama), ", ").concat(rp(m.harga)).concat(inCart ? ", sudah ".concat(inCart.qty, " di pesanan") : "", '">\n      <span class="pic" ').concat(m.foto ? 'style="background-image:url('.concat(m.foto, ')"') : "", ">").concat(m.foto ? "" : '<span class="ini" aria-hidden="true">'.concat(inisial(m.nama), "</span>")).concat(tag).concat(inCart ? '<span class="q">'.concat(inCart.qty, "</span>") : "", '</span>\n      <span class="info"><span class="nm clamp2">').concat(esc(m.nama), '</span><span class="hg">').concat(rp(m.harga), "</span></span></button>");
+    const inTn = m.nasi && S.cart.items.find((x) => x.id === m.id + TN), isi = '<span class="pic" '.concat(m.foto ? 'style="background-image:url('.concat(m.foto, ')"') : "", ">").concat(m.foto ? "" : '<span class="ini" aria-hidden="true">'.concat(inisial(m.nama), "</span>")).concat(tag).concat(inCart ? '<span class="q">'.concat(inCart.qty, "</span>") : "", '</span>\n      <span class="info"><span class="nm clamp2">').concat(esc(m.nama), '</span><span class="hg">').concat(rp(m.harga)).concat(m.nasi ? ' <span class="small muted" style="font-weight:500">pakai nasi</span>' : "", "</span></span>"), lbl = 'title="'.concat(esc(m.nama), " \xB7 ").concat(rp(m.harga), '" aria-label="Tambah ').concat(esc(m.nama)).concat(m.nasi ? " pakai nasi" : "", ", ").concat(rp(m.harga)).concat(inCart ? ", sudah ".concat(inCart.qty, " di pesanan") : "", '"');
+    return m.nasi ? '<div class="mcard nasi '.concat(inCart || inTn ? "on" : "", '"><button class="mmain" data-a="add" data-id="').concat(m.id, '" ').concat(lbl, ">").concat(isi, '</button><button class="tn ').concat(inTn ? "on" : "", '" data-a="add" data-id="').concat(m.id + TN, '" aria-label="Tambah ').concat(esc(m.nama), " tanpa nasi, ").concat(rp(m.hargaTanpa || 0)).concat(inTn ? ", sudah ".concat(inTn.qty, " di pesanan") : "", '"><span>Tanpa nasi</span><b>').concat(inTn ? '<span class="tq">'.concat(inTn.qty, "\xD7</span> ") : "").concat(rp(m.hargaTanpa || 0), "</b></button></div>") : '<button class="mcard '.concat(inCart ? "on" : "", '" data-a="add" data-id="').concat(m.id, '" ').concat(lbl, ">").concat(isi, "</button>");
   }).join(""), total = cartTotal(), rows = S.cart.items.map((it) => {
     const m = menuById(it.id);
     return m ? '<div class="crow"><div class="nm"><b class="clamp2" title="'.concat(esc(m.nama), '">').concat(esc(m.nama), '</b><span class="small muted num">@ ').concat(rp(m.harga), '</span></div>\n      <div class="stepper"><button class="qb" data-a="dec" data-id="').concat(m.id, '" aria-label="Kurangi ').concat(esc(m.nama), '">\u2212</button><b aria-live="polite">').concat(it.qty, '</b><button class="qb p" data-a="add" data-id="').concat(m.id, '" aria-label="Tambah ').concat(esc(m.nama), '">+</button></div>\n      <b class="r num">').concat(rp(m.harga * it.qty), "</b></div>") : "";
@@ -871,7 +1056,7 @@ function vBayar() {
   const total = cartTotal();
   if (!total)
     return S.view = "kasir", vKasir();
-  const b = S.bayar, dib = b.metode === "tunai" ? parseInt(b.input || "0", 10) : total, p = hitungPembayaran(total, dib), err = validasi(b.metode, total, dib, b.cek), items = S.cart.items.map((it) => {
+  const b = S.bayar, _pt = b.metode === "patungan" ? b.cek.belum = hitungPatungan(total, b).belum : 0, dib = b.metode === "tunai" ? parseInt(b.input || "0", 10) : total, p = hitungPembayaran(total, dib), err = validasi(b.metode, total, dib, b.cek), items = S.cart.items.map((it) => {
     const m = menuById(it.id);
     return '<div class="bill-row"><span class="qbox">'.concat(it.qty, '\xD7</span><span style="min-width:0"><b class="clamp2" style="font-weight:600">').concat(esc(m.nama), '</b><span class="small muted num">@ ').concat(rp(m.harga), '</span></span><b class="num">').concat(rp(m.harga * it.qty), "</b></div>");
   }).join(""), ck = (k, l) => '<label class="ck"><input type="checkbox" id="ck-'.concat(k, '" data-a="cek" data-v="').concat(k, '" ').concat(b.cek[k] ? "checked" : "", ">").concat(l, "</label>");
@@ -882,8 +1067,8 @@ function vBayar() {
   } else if (b.metode === "qris")
     body = '<p class="muted">Minta pelanggan scan QRIS di meja kasir. Notifikasi kadang tidak berbunyi, jadi cek layar HP pelanggan sebelum ia pergi:</p>\n      <div>'.concat(ck("toko", "Nama toko benar: ".concat(esc(S.set.namaToko)))).concat(ck("nominal", "Nominal tepat ".concat(rp(total)))).concat(ck("berhasil", "Status \u201CBerhasil\u201D di HP pelanggan"), '</div>\n      <p class="note">Semua QRIS dicocokkan lagi dengan riwayat merchant saat Tutup Hari.</p>');
   else {
-    const bagi = bagiPatungan(total, b.orang);
-    body = '<div class="row"><b>Dibagi untuk</b><div class="stepper"><button class="qb" data-a="orang" data-v="-1" aria-label="Kurangi jumlah orang">\u2212</button><b style="font-size:22px;min-width:40px">'.concat(b.orang, '</b><button class="qb p" data-a="orang" data-v="1" aria-label="Tambah jumlah orang">+</button><span class="muted">orang</span></div></div>\n      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--s2)">').concat(bagi.map((v, i) => '<div style="background:var(--bg);border-radius:var(--r-md);padding:var(--s3) var(--s4)"><span class="small muted">Orang '.concat(i + 1, '</span><br><b class="num" style="font-size:18px">').concat(rp(v), "</b></div>")).join(""), '</div>\n      <p class="note">Tiap orang boleh bayar tunai atau QRIS. Sisa pembulatan masuk ke orang pertama.</p>\n      ').concat(ck("patungan", "Semua bagian sudah dibayar"));
+    const hp = hitungPatungan(total, b), urut = b.mode !== "rata", orangBtn = (u) => Array.from({ length: b.orang }, (_, o) => '<button class="pc '.concat(b.milik[u.key] === o ? "on" : "", '" data-a="milik" data-v="').concat(esc(u.key), "|").concat(o, '" aria-pressed="').concat(b.milik[u.key] === o, '" aria-label="').concat(esc(u.nama), " milik orang ").concat(o + 1, '">').concat(o + 1, "</button>")).join("");
+    body = '<div class="seg" role="group" aria-label="Cara membagi"><button class="'.concat(urut ? "on" : "", '" data-a="modePat" data-v="pesanan" aria-pressed="').concat(urut, '">Sesuai pesanan</button><button class="').concat(urut ? "" : "on", '" data-a="modePat" data-v="rata" aria-pressed="').concat(!urut, '">Bagi rata</button></div>\n      <div class="row"><b>Jumlah orang</b><div class="stepper"><button class="qb" data-a="orang" data-v="-1" aria-label="Kurangi jumlah orang">\u2212</button><b style="font-size:22px;min-width:40px">').concat(b.orang, '</b><button class="qb p" data-a="orang" data-v="1" aria-label="Tambah jumlah orang">+</button><span class="muted">orang</span></div></div>\n      ').concat(urut ? '<p class="small muted" style="margin:0">Ketuk nomor orang yang memesan tiap menu.</p><div class="patlist">'.concat(unitPatungan(S.cart.items).map((u) => '<div class="patrow"><span style="min-width:0"><b class="clamp2" style="font-weight:600">'.concat(esc(u.nama), '</b><span class="small muted num">').concat(rp(u.harga), '</span></span><div class="pchips" role="group" aria-label="Pemesan ').concat(esc(u.nama), '">').concat(orangBtn(u), "</div></div>")).join(""), "</div>") : "", '\n      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--s2)">').concat(hp.per.map((x, i) => '<div style="background:var(--bg);border-radius:var(--r-md);padding:var(--s3) var(--s4)"><span class="small muted">Orang '.concat(i + 1, '</span><br><b class="num" style="font-size:18px">').concat(rp(x.total), "</b>").concat(urut && x.isi.length ? '<br><span class="small muted">'.concat(esc(x.isi.join(", ")), "</span>") : "", "</div>")).join(""), "</div>\n      ").concat(urut && hp.belum ? '<p class="note warn" style="margin:0">'.concat(hp.belum, " menu belum dipilih pemesannya (").concat(rp(hp.sisa), ').</p>') : "", '<p class="note">Tiap orang boleh bayar tunai atau QRIS.').concat(urut ? "" : " Sisa pembulatan masuk ke orang pertama.", "</p>\n      ").concat(ck("patungan", "Semua bagian sudah dibayar"));
   }
   return '<div class="page" data-keep="page-bayar"><div class="cols side">\n    <section class="panel">\n      <div class="ph"><button class="btn sm" data-a="go" data-v="kasir">\u2190 Ubah pesanan</button><span class="chip info">'.concat(nomorBerikut()).concat(S.cart.meja ? " \xB7 Meja " + esc(S.cart.meja) : "", " \xB7 ").concat(JENIS[S.cart.jenis], '</span></div>\n      <h2>Rincian tagihan</h2>\n      <div class="bill">').concat(items, "</div>\n      ").concat(S.cart.catatan ? '<p class="note">Catatan: '.concat(esc(S.cart.catatan), "</p>") : "", '\n      <div class="total-bar"><span>Total \xB7 ').concat(cartQty(), " item</span><b>").concat(rp(total), '</b></div>\n    </section>\n    <section class="panel order-first">\n      <div class="row"><h2>Cara bayar</h2><b class="num" style="font-size:18px">').concat(rp(total), '</b></div>\n      <div class="seg" role="group" aria-label="Cara bayar">').concat([["tunai", "Tunai"], ["qris", "QRIS"], ["patungan", "Patungan"]].map(([k, l]) => '<button style="min-height:48px;font-size:15px" class="'.concat(b.metode === k ? "on" : "", '" data-a="metode" data-v="').concat(k, '" aria-pressed="').concat(b.metode === k, '">').concat(l, "</button>")).join(""), "</div>\n      ").concat(body, '\n      <div class="payfoot">\n        ').concat(err[0] ? '<span class="msg-err" role="status"><span aria-hidden="true">!</span>'.concat(esc(err[0]), "</span>") : '<span class="msg-ok" role="status">\u2713 Siap disimpan</span>', '\n        <button class="btn" data-a="simpan" data-v="resi" ').concat(err.length ? "disabled" : "", '>Simpan &amp; resi</button>\n        <button class="btn pri big" data-a="simpan" data-v="kasir" ').concat(err.length ? "disabled" : "", ' style="min-width:160px">Selesai</button>\n      </div>\n    </section></div></div>');
 }
@@ -925,20 +1110,21 @@ function vRiwayat() {
 }
 function vProfil() {
   var _a;
-  const s = S.set, tab = S.profilTab, tiles = [["toko", "T", "Info toko", "Nama, alamat, WA, jam buka"], ["menu", "Rp", "Menu & harga", "".concat(S.menu.filter((m) => m.aktif).length, " menu aktif \xB7 foto \xB7 resep")], ["bahan", "B", "Bahan & biaya", "".concat(S.bahan.length, " bahan \xB7 biaya bersama ").concat(rps(totalOverhead()), "/hari")], ["kasir", "K", "Kasir & PIN", "Kasir aktif: ".concat(s.kasir)], ["resi", "\u2399", "Resi & jam ramai", "Teks resi, jam ramai, ambang harga"], ["data", "\u21EA", "Data & cadangan", "Ekspor CSV, backup, data contoh"], ["pasang", "\u2193", "Pasang di tablet", "Cara install & offline"]], f = (k, l, type = "text", extra = "") => '<label class="field">'.concat(l, '<input id="set-').concat(k, '" type="').concat(type, '" data-i="set" data-k="').concat(k, '" value="').concat(esc(s[k]), '" ').concat(extra, "></label>");
+  const s = S.set, tab = S.profilTab, tiles = [["toko", "T", "Info toko", "Nama, alamat, WA, jam buka"], ["menu", "Rp", "Menu & harga", "".concat(S.menu.filter((m) => m.aktif).length, " menu aktif \xB7 foto \xB7 resep")], ["bahan", "B", "Modal (HPP)", "".concat(S.bahan.length, " bahan \xB7 biaya bersama ").concat(rps(totalOverhead()), "/hari")], ["kasir", "K", "Kasir & PIN", "Kasir aktif: ".concat(s.kasir)], ["resi", "\u2399", "Resi & jam ramai", "Teks resi, jam ramai, ambang harga"], ["data", "\u21EA", "Data & cadangan", "Ekspor CSV, backup, data contoh"], ["pasang", "\u2193", "Pasang di tablet", "Cara install & offline"]], f = (k, l, type = "text", extra = "") => '<label class="field">'.concat(l, '<input id="set-').concat(k, '" type="').concat(type, '" data-i="set" data-k="').concat(k, '" value="').concat(esc(s[k]), '" ').concat(extra, "></label>");
   let body = "";
-  if (tab === "toko" && (body = '<h2>Info toko</h2><div class="formgrid">'.concat(f("namaToko", "Nama toko")).concat(f("pemilik", "Pemilik")).concat(f("alamat", "Alamat (tampil di resi)")).concat(f("wa", "No. WhatsApp toko", "tel")).concat(f("jamBuka", "Jam buka", "number", 'min="0" max="23"')).concat(f("jamTutup", "Jam tutup", "number", 'min="1" max="24"')).concat(f("modalAwal", "Modal awal laci (Rp)", "number", 'min="0" step="1000"')).concat(f("ayamPatokan", "Harga ayam patokan / ekor", "number", 'min="0" step="500"'), '</div><p class="small muted">Perubahan tersimpan otomatis.</p>')), tab === "menu" && (body = '<div class="ph"><h2>Menu &amp; harga</h2><button class="btn sm pri" data-a="formMenu">+ Tambah menu</button></div>\n    <p class="small muted">Ketuk kotak foto untuk memotret atau memilih foto lauk. Foto diperkecil otomatis dan disimpan di tablet. Modal dihitung otomatis dari resep (bahan \xD7 harga per satuan) + biaya bersama. Ketuk angka modal untuk mengatur resep.</p>\n    <div class="mrow h"><span>Foto</span><span>Menu</span><span>Harga jual</span><span>Modal/porsi</span><span>Aktif</span></div>\n    '.concat(KATEGORI.map(([k, l]) => '<h3 style="padding-top:var(--s3);color:var(--purple-d)">'.concat(l, "</h3>") + S.menu.filter((m) => m.kat === k).map((m) => '<div class="mrow">\n      <span style="display:flex;flex-direction:column;align-items:center;gap:2px"><label class="thumb" style="'.concat(m.foto ? "background-image:url(".concat(m.foto, ");border-style:solid") : "", '" title="Ganti foto ').concat(esc(m.nama), '">').concat(m.foto ? "" : "+ Foto", '<input type="file" accept="image/*" data-i="menuFoto" data-id="').concat(m.id, '" hidden aria-label="Foto ').concat(esc(m.nama), '"></label>').concat(m.foto ? '<button class="linkbtn" data-a="hapusFoto" data-id="'.concat(m.id, '">hapus</button>') : "", '</span>\n      <span style="min-width:0"><b class="clamp2" style="font-weight:600" title="').concat(esc(m.nama), '">').concat(esc(m.nama), "</b>").concat(m.diubah ? '<span class="small muted">harga diubah '.concat(esc(hariPendek(m.diubah)), "</span>") : "", '</span>\n      <label><span class="sr">Harga ').concat(esc(m.nama), '</span><input id="h-').concat(m.id, '" class="inp num" type="number" step="500" min="0" data-i="menuHarga" data-id="').concat(m.id, '" value="').concat(m.harga, '"></label>\n      ').concat((() => {
+  if (tab === "toko" && (body = '<h2>Info toko</h2><div class="formgrid">'.concat(f("namaToko", "Nama toko")).concat(f("pemilik", "Pemilik")).concat(f("alamat", "Alamat (tampil di resi)")).concat(f("wa", "No. WhatsApp toko", "tel")).concat(f("jamBuka", "Jam buka", "number", 'min="0" max="23"')).concat(f("jamTutup", "Jam tutup", "number", 'min="1" max="24"')).concat(f("modalAwal", "Modal awal laci (Rp)", "number", 'min="0" step="1000"')).concat(f("ayamPatokan", "Harga ayam patokan / ekor", "number", 'min="0" step="500"'), '</div><p class="small muted">Perubahan tersimpan otomatis.</p>')), tab === "menu" && (body = '<div class="ph"><h2>Menu &amp; harga</h2><button class="btn sm pri" data-a="formMenu">+ Tambah menu</button></div>\n    <p class="small muted">Ketuk kotak foto untuk memotret atau memilih foto lauk. Foto diperkecil otomatis dan disimpan di tablet. Modal dihitung otomatis dari resep (bahan \xD7 harga per satuan) + biaya bersama. Ketuk angka modal untuk mengatur resep.</p>\n    <div class="mrow h"><span>Foto</span><span>Menu</span><span>Harga jual</span><span>Modal/porsi</span><span>Aktif</span></div>\n    '.concat(KATEGORI.map(([k, l]) => '<h3 style="padding-top:var(--s3);color:var(--purple-d)">'.concat(l, "</h3>") + S.menu.filter((m) => m.kat === k).map((m) => '<div class="mrow">\n      <span style="display:flex;flex-direction:column;align-items:center;gap:2px"><label class="thumb" style="'.concat(m.foto ? "background-image:url(".concat(m.foto, ");border-style:solid") : "", '" title="Ganti foto ').concat(esc(m.nama), '">').concat(m.foto ? "" : "+ Foto", '<input type="file" accept="image/*" data-i="menuFoto" data-id="').concat(m.id, '" hidden aria-label="Foto ').concat(esc(m.nama), '"></label>').concat(m.foto ? '<button class="linkbtn" data-a="hapusFoto" data-id="'.concat(m.id, '">hapus</button>') : "", '</span>\n      <span style="min-width:0"><b class="clamp2" style="font-weight:600" title="').concat(esc(m.nama), '">').concat(esc(m.nama), "</b>").concat(m.diubah ? '<span class="small muted">harga diubah '.concat(esc(hariPendek(m.diubah)), "</span>") : "", '</span>\n      <label><span class="sr">Harga ').concat(esc(m.nama), '</span><input id="h-').concat(m.id, '" class="inp num" type="number" step="500" min="0" data-i="menuHarga" data-id="').concat(m.id, '" value="').concat(m.harga, '"></label>' + (m.nasi ? '<label class="small muted" style="display:block;margin-top:4px">Tanpa nasi<input id="ht-' + m.id + '" class="inp num" type="number" step="500" min="0" data-i="menuHargaTn" data-id="' + m.id + '" value="' + (m.hargaTanpa || 0) + '"></label>' : '') + '\n      ').concat((() => {
     const r = rincianModal(m);
-    return '<button class="btn sm" style="justify-content:space-between;font-variant-numeric:tabular-nums" data-a="formResep" data-id="'.concat(m.id, '" aria-label="Atur resep dan modal ').concat(esc(m.nama), '"><span>').concat(rp(m.modal), '</span><span class="small muted">').concat(r.otomatis ? "auto" : "manual", "</span></button>");
+    return '<button class="btn sm" style="justify-content:space-between;font-variant-numeric:tabular-nums" data-a="formResep" data-id="'.concat(m.id, '" aria-label="Atur resep dan modal ').concat(esc(m.nama), '"><span>').concat(m.modal || r.otomatis ? rp(m.modal) : "Isi modal", '</span><span class="small muted">').concat(r.otomatis ? "auto" : m.modal ? "manual" : "!", "</span></button>");
   })(), '\n      <button class="switch ').concat(m.aktif ? "on" : "", '" role="switch" aria-checked="').concat(m.aktif, '" data-a="menuAktif" data-id="').concat(m.id, '" aria-label="Tampilkan ').concat(esc(m.nama), ' di kasir"></button></div>')).join("")).join(""))), tab === "bahan") {
     const P = porsiMasakanHarian(), oh = overheadPorsi();
     body = '<div class="ph"><h2>Bahan baku</h2><button class="btn sm pri" data-a="tambahBahan">+ Tambah bahan</button></div>\n    <p class="small muted">Isi harga beli seperti di nota pasar, lalu \u201Cjadi berapa\u201D saat dipakai. Contoh: ayam 1 kg Rp34.000 jadi 8 potong \u2192 Rp4.250 per potong. Modal semua menu yang memakai bahan itu ikut berubah otomatis.</p>\n    <div style="overflow-x:auto"><table class="data" style="font-size:14px"><thead><tr><th scope="col">Bahan</th><th scope="col" class="r">Harga beli</th><th scope="col">Per</th><th scope="col" class="r">Jadi</th><th scope="col">Satuan pakai</th><th scope="col" class="r">= Per satuan</th><th scope="col"><span class="sr">Hapus</span></th></tr></thead><tbody>\n    '.concat(S.bahan.map((b) => '<tr>\n      <td><label class="sr" for="bn-'.concat(b.id, '">Nama bahan</label><input id="bn-').concat(b.id, '" class="inp" style="min-height:40px;font-size:14px;min-width:110px;width:100%" data-i="bahan" data-id="').concat(b.id, '" data-k="nama" value="').concat(esc(b.nama), '"></td>\n      <td><label class="sr" for="bh-').concat(b.id, '">Harga beli ').concat(esc(b.nama), '</label><input id="bh-').concat(b.id, '" class="inp num r" style="min-height:40px;font-size:14px;width:96px" type="number" step="500" min="0" data-i="bahan" data-id="').concat(b.id, '" data-k="harga" value="').concat(b.harga, '"></td>\n      <td><label class="sr" for="bs-').concat(b.id, '">Satuan beli</label><input id="bs-').concat(b.id, '" class="inp" style="min-height:40px;font-size:14px;width:64px" data-i="bahan" data-id="').concat(b.id, '" data-k="satuan" value="').concat(esc(b.satuan), '"></td>\n      <td><label class="sr" for="bi-').concat(b.id, '">Jadi berapa</label><input id="bi-').concat(b.id, '" class="inp num r" style="min-height:40px;font-size:14px;width:56px" type="number" min="1" data-i="bahan" data-id="').concat(b.id, '" data-k="isi" value="').concat(b.isi, '"></td>\n      <td><label class="sr" for="bu-').concat(b.id, '">Satuan pakai</label><input id="bu-').concat(b.id, '" class="inp" style="min-height:40px;font-size:14px;width:84px" data-i="bahan" data-id="').concat(b.id, '" data-k="unit" value="').concat(esc(b.unit), '"></td>\n      <td class="r num"><b id="bpu-').concat(b.id, '">').concat(rp(Math.round(hargaUnit(b))), '</b></td>\n      <td><button class="linkbtn" data-a="hapusBahan" data-id="').concat(b.id, '" aria-label="Hapus ').concat(esc(b.nama), '">hapus</button></td></tr>')).join(""), '</tbody></table></div>\n    <div class="ph" style="margin-top:var(--s3)"><h2>Biaya bersama per hari</h2><button class="btn sm" data-a="tambahOverhead">+ Tambah biaya</button></div>\n    <p class="small muted">Bumbu, minyak, gas, dan listrik dipakai bersama untuk semua masakan, jadi tidak dihitung per porsi langsung. Isi perkiraan biaya per hari; aplikasi membaginya rata ke setiap porsi lauk, pendamping, dan paket. Nasi &amp; minuman hanya dihitung dari bahannya. Gaji tidak dimasukkan di sini (dicatat sebagai uang keluar di layar Untung).</p>\n    <table class="data"><tbody>').concat(S.overhead.map((o) => '<tr><td><label class="sr" for="on-'.concat(o.id, '">Nama biaya</label><input id="on-').concat(o.id, '" class="inp" style="min-height:40px;font-size:14px" data-i="overhead" data-id="').concat(o.id, '" data-k="nama" value="').concat(esc(o.nama), '"></td>\n      <td class="r"><label class="sr" for="op-').concat(o.id, '">Biaya per hari ').concat(esc(o.nama), '</label><input id="op-').concat(o.id, '" class="inp num r" style="min-height:40px;font-size:14px;width:130px" type="number" step="1000" min="0" data-i="overhead" data-id="').concat(o.id, '" data-k="perHari" value="').concat(o.perHari, '"></td>\n      <td><button class="linkbtn" data-a="hapusOverhead" data-id="').concat(o.id, '" aria-label="Hapus ').concat(esc(o.nama), '">hapus</button></td></tr>')).join(""), '</tbody></table>\n    <div class="panel" style="background:var(--bg);gap:var(--s2)">\n      <div class="kv"><span>Total biaya bersama / hari</span><b id="ohTot">').concat(rp(totalOverhead()), '</b></div>\n      <div class="kv"><span>Porsi masakan / hari ').concat(P.auto ? "(rata-rata ".concat(P.hari || 0, " hari terakhir)") : "(diisi manual)", "</span><b>").concat(P.n, '</b></div>\n      <label class="field">Isi manual porsi per hari (0 = otomatis dari penjualan)<input id="set-porsiHari" type="number" min="0" data-i="porsiHari" value="').concat(S.set.porsiHari, '"></label>\n      <div class="kv" style="font-weight:700;border-top:1px solid var(--line);padding-top:var(--s2)"><span>= Biaya bersama per porsi</span><span id="ohPorsi">').concat(rp(oh), "</span></div>\n    </div>");
   }
+  tab === "bahan" && (body = vBahan());
   if (tab === "kasir" && (body = '<h2>Kasir &amp; PIN</h2><div class="formgrid">'.concat(f("kasir", "Nama kasir yang sedang bertugas"), '</div>\n    <div class="note"><b>PIN pemilik</b> dipakai untuk membatalkan transaksi dan menghapus data. PIN awal 1234, segera ganti.</div><button class="btn" data-a="formPin">Ganti PIN pemilik</button>')), tab === "resi" && (body = '<h2>Resi &amp; jam ramai</h2><div class="formgrid">'.concat(f("kakiResi", "Teks kaki resi"), '<label class="field">Jam ramai (cth: 12-14, 18-20)<input id="set-ramai" data-i="ramai" value="').concat(esc(s.ramai.map((r) => r.join("-")).join(", ")), '"></label>\n    <label class="field">Ambang peringatan harga (%)<input id="set-ambang" type="number" min="1" max="100" data-i="ambang" value="').concat(Math.round(s.ambang * 100), '"></label>').concat(f("potong", "Potong ayam per ekor", "number", 'min="1" max="16"'), '</div>\n    <h3>Contoh resi</h3><div class="paper">').concat(esc(resiTeks({ nomor: "A-001", tanggal: hariIni(), waktu: isoNow(), jenis: "makan", meja: "1", kasir: s.kasir, items: [{ nama: "Nasi Putih", harga: 6e3, qty: 1 }, { nama: "Ayam Pop", harga: 18e3, qty: 1 }], total: 24e3, metode: "tunai", dibayar: 5e4, kembalian: 26e3, status: "lunas" }, s)), "</div>")), tab === "data") {
     const first = S.tx.reduce((m, t) => !m || t.tanggal < m ? t.tanggal : m, null);
-    body = '<h2>Data &amp; cadangan</h2>\n    <p class="note">'.concat(S.tx.length, " transaksi \xB7 ").concat(S.keluar.length, " uang keluar \xB7 ").concat(S.hari.length, " hari ditutup").concat(first ? " \xB7 sejak " + esc(hariPendek(first)) : "", '</p>\n    <div class="note ').concat(S.set.lastBackup ? "" : "warn", '"><b>Aturan pakai: satu tablet kasir = satu-satunya tempat mencatat.</b> Semua transaksi hanya diinput di tablet ini (offline, tidak butuh sinyal). HP pemilik tidak dipakai untuk input. Untuk pindah/ganti tablet: Cadangkan di tablet lama \u2192 Pulihkan di tablet baru. Cadangan terakhir: <b>').concat(S.set.lastBackup ? esc(hariPendek(S.set.lastBackup.slice(0, 10))) + " " + jamMenit(S.set.lastBackup) : "belum pernah", '</b>.</div>\n    <div class="tiles">\n      <button class="tile" data-a="eksporCSV"><span class="ic">CSV</span><span><b>Ekspor transaksi</b><br><span class="small muted">Buka di Excel / Google Sheets</span></span></button>\n      <button class="tile" data-a="backup"><span class="ic">\u21EA</span><span><b>Cadangkan semua data</b><br><span class="small muted">File .json, simpan di Drive</span></span></button>\n      <label class="tile" style="cursor:pointer"><span class="ic">\u21E9</span><span><b>Pulihkan dari cadangan</b><br><span class="small muted">Pilih file .json</span></span><input id="restore" type="file" accept="application/json,.json" data-i="restore" hidden></label>\n      ').concat(S.contoh ? '<button class="tile" data-a="hapusContoh"><span class="ic" style="background:var(--coral-t);color:var(--coral-x)">\u2715</span><span><b>Hapus data contoh</b><br><span class="small muted">Mulai pakai data asli toko</span></span></button>' : '<button class="tile" data-a="isiContoh"><span class="ic">\uFF0B</span><span><b>Isi data contoh 30 hari</b><br><span class="small muted">Untuk demo presentasi</span></span></button>', '\n    </div>\n    <button class="btn sm" style="align-self:flex-start;color:var(--coral-x)" data-a="formReset">Hapus semua data (perlu PIN)</button>');
+    body = '<h2>Data &amp; cadangan</h2>' + infoToko() + '\n    <p class="note">'.concat(S.tx.length, " transaksi \xB7 ").concat(S.keluar.length, " uang keluar \xB7 ").concat(S.hari.length, " hari ditutup").concat(first ? " \xB7 sejak " + esc(hariPendek(first)) : "", '</p>\n    <div class="note ').concat(S.set.lastBackup || CL.on ? "" : "warn", '">' + (CL.on ? '<b>Database toko aktif.</b> Semua HP dengan kode toko ini memakai data yang sama. Tetap bisa dipakai offline; perubahan dikirim otomatis saat ada sinyal. Cadangan tetap berguna sebagai arsip.' : '<b>Aturan pakai: satu tablet kasir = satu-satunya tempat mencatat.</b> Semua transaksi hanya diinput di tablet ini (offline, tidak butuh sinyal). HP pemilik tidak dipakai untuk input. Untuk pindah/ganti tablet: Cadangkan di tablet lama \u2192 Pulihkan di tablet baru.') + ' Cadangan terakhir: <b>').concat(S.set.lastBackup ? esc(hariPendek(S.set.lastBackup.slice(0, 10))) + " " + jamMenit(S.set.lastBackup) : "belum pernah", '</b>.</div>\n    <div class="tiles">\n      <button class="tile" data-a="eksporCSV"><span class="ic">CSV</span><span><b>Ekspor transaksi</b><br><span class="small muted">Buka di Excel / Google Sheets</span></span></button>\n      <button class="tile" data-a="backup"><span class="ic">\u21EA</span><span><b>Cadangkan semua data</b><br><span class="small muted">File .json, simpan di Drive</span></span></button>\n      <label class="tile" style="cursor:pointer"><span class="ic">\u21E9</span><span><b>Pulihkan dari cadangan</b><br><span class="small muted">Pilih file .json</span></span><input id="restore" type="file" accept="application/json,.json" data-i="restore" hidden></label>\n      ').concat(S.contoh ? '<button class="tile" data-a="hapusContoh"><span class="ic" style="background:var(--coral-t);color:var(--coral-x)">\u2715</span><span><b>Hapus data contoh</b><br><span class="small muted">Mulai pakai data asli toko</span></span></button>' : '<button class="tile" data-a="isiContoh"><span class="ic">\uFF0B</span><span><b>Isi data contoh 30 hari</b><br><span class="small muted">Untuk demo presentasi</span></span></button>', '\n    </div>\n    <button class="btn sm" style="align-self:flex-start;color:var(--coral-x)" data-a="formReset">Hapus semua data (perlu PIN)</button>');
   }
-  return tab === "pasang" && (body = '<h2>Pasang di tablet</h2>\n    <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:var(--s2);line-height:1.5">\n      <li>Buka alamat aplikasi ini di <b>Chrome</b> (Android) atau <b>Safari</b> (iPad).</li>\n      <li>Chrome: menu \u22EE \u2192 <b>Instal aplikasi</b>. Safari: Bagikan \u2192 <b>Tambah ke Layar Utama</b>.</li>\n      <li>Buka dari ikon \u201CKasir PG\u201D. Setelah dibuka sekali, aplikasi tetap jalan tanpa internet.</li>\n      <li>Data tersimpan di tablet ini. Cadangkan rutin lewat <b>Data &amp; cadangan</b>.</li>\n      <li>Biarkan jam tablet otomatis (zona WIB). Hari ditutup &amp; dibuka sendiri pukul 00.00.</li>\n    </ol>\n    <div class="kv note"><span>Siap offline</span><b>'.concat("serviceWorker" in navigator && navigator.serviceWorker.controller ? "\u2713 Ya" : "Muat ulang sekali saat online", '</b></div>\n    <div class="kv note"><span>Penyimpanan</span><b>').concat(idb ? S.persist ? "\u2713 Permanen" : "\u2713 Di perangkat" : "! Tidak tersedia, data hilang saat ditutup", "</b></div>")), '<div class="page" data-keep="page-profil"><div class="cols side">\n    <div class="stack">\n      <section class="panel dark">\n        <div class="row" style="justify-content:flex-start;gap:var(--s4)"><div style="width:64px;height:64px;border-radius:var(--r-lg);background:var(--purple);box-shadow:0 0 0 3px var(--peach);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex:none">PG</div>\n          <div style="min-width:0"><h2>'.concat(esc(s.namaToko), '</h2><span class="small muted">Pemilik: ').concat(esc(s.pemilik), "</span></div></div>\n        ").concat([["Alamat", s.alamat || "Belum diisi"], ["WhatsApp", s.wa || "Belum diisi"], ["Jam buka", "".concat(s.jamBuka, ".00 \u2013 ").concat(s.jamTutup, ".00")], ["Modal awal laci", rp(s.modalAwal)], ["Kasir bertugas", s.kasir], ["Hari aktif", "".concat(hariPendek(hariIni()), " \xB7 ").concat(((_a = S.aktif) == null ? void 0 : _a.status) === "tutup" ? "tutup" : "buka")]].map(([k, v]) => '<div class="kv small"><span class="muted">'.concat(k, '</span><b style="text-align:right">').concat(esc(v), "</b></div>")).join(""), '\n        <button class="btn ondark" data-a="go" data-v="hari">Tutup hari \u2192</button>\n      </section>\n      <nav class="tiles" aria-label="Bagian pengaturan" style="grid-template-columns:minmax(0,1fr)">').concat(tiles.map(([k, ic, t, d]) => '<button class="tile '.concat(tab === k ? "on" : "", '" data-a="profilTab" data-v="').concat(k, '" ').concat(tab === k ? 'aria-current="true"' : "", '><span class="ic" aria-hidden="true">').concat(ic, '</span><span style="min-width:0"><b>').concat(t, '</b><br><span class="small muted">').concat(esc(d), "</span></span></button>")).join(""), '</nav>\n    </div>\n    <section class="panel" id="profil-body">').concat(body, "</section>\n  </div></div>");
+  return tab === "pasang" && (body = '<h2>Pasang di tablet</h2>\n    <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:var(--s2);line-height:1.5">\n      <li>Buka alamat aplikasi ini di <b>Chrome</b> (Android) atau <b>Safari</b> (iPad).</li>\n      <li>Chrome: menu \u22EE \u2192 <b>Instal aplikasi</b>. Safari: Bagikan \u2192 <b>Tambah ke Layar Utama</b>.</li>\n      <li>Buka dari ikon \u201CKasir PG\u201D. Setelah dibuka sekali, aplikasi tetap jalan tanpa internet.</li>\n      <li>' + (CL.on ? 'Data tersimpan di database toko dan sama di semua HP yang memakai kode toko ini.' : 'Data tersimpan di tablet ini. Cadangkan rutin lewat <b>Data &amp; cadangan</b>.') + '</li>\n      <li>Biarkan jam tablet otomatis (zona WIB). Hari ditutup &amp; dibuka sendiri pukul 00.00.</li>\n    </ol>\n    <div class="kv note"><span>Siap offline</span><b>'.concat("serviceWorker" in navigator && navigator.serviceWorker.controller ? "\u2713 Ya" : "Muat ulang sekali saat online", '</b></div>\n    <div class="kv note"><span>Penyimpanan</span><b>').concat(idb ? S.persist ? "\u2713 Permanen" : "\u2713 Di perangkat" : "! Tidak tersedia, data hilang saat ditutup", "</b></div>")), '<div class="page" data-keep="page-profil"><div class="cols side">\n    <div class="stack">\n      <section class="panel dark">\n        <div class="row" style="justify-content:flex-start;gap:var(--s4)"><div style="width:64px;height:64px;border-radius:var(--r-lg);background:var(--purple);box-shadow:0 0 0 3px var(--peach);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex:none">PG</div>\n          <div style="min-width:0"><h2>'.concat(esc(s.namaToko), '</h2><span class="small muted">Pemilik: ').concat(esc(s.pemilik), "</span></div></div>\n        ").concat([["Alamat", s.alamat || "Belum diisi"], ["WhatsApp", s.wa || "Belum diisi"], ["Jam buka", "".concat(s.jamBuka, ".00 \u2013 ").concat(s.jamTutup, ".00")], ["Modal awal laci", rp(s.modalAwal)], ["Kasir bertugas", s.kasir], ["Hari aktif", "".concat(hariPendek(hariIni()), " \xB7 ").concat(((_a = S.aktif) == null ? void 0 : _a.status) === "tutup" ? "tutup" : "buka")]].map(([k, v]) => '<div class="kv small"><span class="muted">'.concat(k, '</span><b style="text-align:right">').concat(esc(v), "</b></div>")).join(""), '\n        <button class="btn ondark" data-a="go" data-v="hari">Tutup hari \u2192</button>\n      </section>\n      <nav class="tiles" aria-label="Bagian pengaturan" style="grid-template-columns:minmax(0,1fr)">').concat(tiles.map(([k, ic, t, d]) => '<button class="tile '.concat(tab === k ? "on" : "", '" data-a="profilTab" data-v="').concat(k, '" ').concat(tab === k ? 'aria-current="true"' : "", '><span class="ic" aria-hidden="true">').concat(ic, '</span><span style="min-width:0"><b>').concat(t, '</b><br><span class="small muted">').concat(esc(d), "</span></span></button>")).join(""), '</nav>\n    </div>\n    <section class="panel" id="profil-body">').concat(body, "</section>\n  </div></div>");
 }
 async function simpanTransaksi(lanjut) {
   const total = cartTotal(), b = S.bayar, dib = b.metode === "tunai" ? parseInt(b.input || "0", 10) : total;
@@ -965,6 +1151,7 @@ async function simpanTransaksi(lanjut) {
     status: "lunas",
     kasir: S.set.kasir
   };
+  b.metode === "patungan" && (t.patungan = hitungPatungan(total, b).per.map((x, i) => ({ orang: i + 1, total: x.total, isi: x.isi })), t.bagiRata = b.mode === "rata");
   S.tx.push(t), S.lastId = t.id;
   const ok = await dbPut("tx", t);
   S.cart = { items: [], jenis: "makan", meja: "", catatan: "" }, resetBayar(), lanjut === "resi" ? (S.resiId = t.id, go("resi")) : go("kasir"), toast(ok ? "".concat(t.nomor, " tersimpan \xB7 ").concat(rp(t.total)) : "Transaksi belum tersimpan di perangkat");
@@ -1025,7 +1212,7 @@ function renderResepTotal() {
 }
 function resepTotalHTML(r) {
   const m = menuById(S.resepEdit.id);
-  return r.otomatis ? '<div class="kv"><span>Bahan</span><span>'.concat(rp(r.bahan), "</span></div>").concat(KAT_MASAKAN.includes(m.kat) ? '<div class="kv"><span>Biaya bersama (bumbu, gas, dll.)</span><span>'.concat(rp(r.oh), "</span></div>") : "", '\n    <div class="kv" style="font-weight:700;border-top:1px solid var(--line);padding-top:var(--s2)"><span>Modal per porsi</span><span>').concat(rp(r.total), '</span></div>\n    <div class="kv small muted"><span>Harga jual ').concat(rp(m.harga), "</span><span>Untung kotor ").concat(rp(m.harga - r.total), " (").concat(pct(m.harga - r.total, m.harga), "%)</span></div>") : '<label class="field">Belum ada bahan. Isi modal manual (Rp)<input id="resepManual" type="number" min="0" step="500" data-i="resepManual" value="'.concat(esc(S.resepEdit.manual), '"></label>');
+  return r.otomatis ? '<div class="kv"><span>Lauk / bahan</span><span>'.concat(rp(r.bahan), "</span></div>").concat(r.nasi ? '<div class="kv"><span>Nasi 1 porsi</span><span>'.concat(rp(r.nasi), "</span></div>") : "").concat(KAT_MASAKAN.includes(m.kat) ? '<div class="kv"><span>Biaya bersama (bumbu, gas, dll.)</span><span>'.concat(rp(r.oh), "</span></div>") : "", '\n    <div class="kv" style="font-weight:700;border-top:1px solid var(--line);padding-top:var(--s2)"><span>Modal per porsi</span><span>').concat(rp(r.total), '</span></div>\n    <div class="kv small muted"><span>Harga jual ').concat(rp(m.harga), "</span><span>Untung kotor ").concat(rp(m.harga - r.total), " (").concat(pct(m.harga - r.total, m.harga), "%)</span></div>").concat(m.nasi ? '<div class="kv small muted"><span>Tanpa nasi: jual '.concat(rp(m.hargaTanpa || 0), " \xB7 modal ").concat(rp(r.total - r.nasi), "</span><span>Untung ").concat(rp((m.hargaTanpa || 0) - (r.total - r.nasi)), "</span></div>") : "") : '<label class="field">Belum ada bahan. Isi modal manual (Rp)<input id="resepManual" type="number" min="0" step="500" data-i="resepManual" value="'.concat(esc(S.resepEdit.manual), '"></label>');
 }
 function renderResep() {
   const e = S.resepEdit, m = menuById(e.id);
@@ -1091,7 +1278,15 @@ const A = {
     S.bayar.cek[d.v] = e.target.checked, render();
   },
   orang: (d) => {
-    S.bayar.orang = Math.max(2, Math.min(12, S.bayar.orang + +d.v)), render();
+    const b = S.bayar;
+    b.orang = Math.max(2, Math.min(12, b.orang + +d.v)), Object.keys(b.milik).forEach((k) => b.milik[k] >= b.orang && delete b.milik[k]), render();
+  },
+  milik: (d) => {
+    const i = d.v.lastIndexOf("|"), k = d.v.slice(0, i), o = +d.v.slice(i + 1), m = S.bayar.milik;
+    m[k] === o ? delete m[k] : m[k] = o, render();
+  },
+  modePat: (d) => {
+    S.bayar.mode = d.v, render();
   },
   simpan: (d) => simpanTransaksi(d.v),
   resi: async (d) => {
@@ -1110,7 +1305,7 @@ const A = {
     const t = hariIni(), rs = ringkasHari(S.tx, t), modal = (_a = S.aktif.modalAwal) != null ? _a : S.set.modalAwal, rec0 = S.hari.find((h) => h.tanggal === t), hasil = parseInt((_c = (_b = S.hitungLaci) != null ? _b : rec0 == null ? void 0 : rec0.hasilHitung) != null ? _c : "", 10);
     if (isNaN(hasil)) return;
     const sisa = parseInt((_e = (_d = S.sisaAyam) != null ? _d : rec0 == null ? void 0 : rec0.sisaAyam) != null ? _e : "", 10), rec = { tanggal: t, status: "tutup", dibuka: S.aktif.dibuka, ditutup: isoNow(), modalAwal: modal, total: rs.total, tunai: rs.tunai, qris: rs.qris, jumlah: rs.jumlah, porsi: rs.porsi, hasilHitung: hasil, selisih: hasil - (modal + rs.tunai), sisaAyam: isNaN(sisa) ? null : sisa };
-    S.hari = S.hari.filter((h) => h.tanggal !== t).concat(rec), await dbPut("hari", rec), S.aktif.status = "tutup", await saveMeta("aktif", S.aktif), S.hitungLaci = null, S.sisaAyam = null, render(), showModal("<h2>Hari ditutup ".concat(rec.selisih === 0 ? "\u2713 kas cocok" : "\xB7 selisih " + rp(rec.selisih), '</h2>\n      <p class="muted">Data tersimpan di tablet ini. Agar tidak hilang bila tablet rusak atau diganti, simpan cadangan hari ini lalu kirim ke Google Drive atau WhatsApp pemilik.</p>\n      <div class="row"><button class="btn" data-a="close">Nanti saja</button><button class="btn pri" data-a="backup">Simpan cadangan sekarang</button></div>'));
+    S.hari = S.hari.filter((h) => h.tanggal !== t).concat(rec), await dbPut("hari", rec), S.aktif.status = "tutup", await saveMeta("aktif", S.aktif), S.hitungLaci = null, S.sisaAyam = null, render(), showModal("<h2>Hari ditutup ".concat(rec.selisih === 0 ? "\u2713 kas cocok" : "\xB7 selisih " + rp(rec.selisih), '</h2>\n      <p class="muted">' + (CL.on ? 'Data sudah tersimpan di database toko. Cadangan tetap berguna sebagai arsip.' : 'Data tersimpan di tablet ini. Agar tidak hilang bila tablet rusak atau diganti, simpan cadangan hari ini lalu kirim ke Google Drive atau WhatsApp pemilik.') + '</p>\n      <div class="row"><button class="btn" data-a="close">Nanti saja</button><button class="btn pri" data-a="backup">Simpan cadangan sekarang</button></div>'));
   },
   bukaLagi: async () => {
     S.aktif.status = "buka", await saveMeta("aktif", S.aktif), toast("Toko dibuka lagi"), render();
@@ -1267,7 +1462,7 @@ const A = {
     const c = buatContoh(), ids = new Set(S.tx.map((t) => t.tanggal)), txs = c.txs.filter((t) => !ids.has(t.tanggal)), hari = c.hari.filter((h) => !S.hari.some((x) => x.tanggal === h.tanggal));
     S.tx.push(...txs), S.keluar.push(...c.kel), S.hari.push(...hari), await dbPutMany("tx", txs), await dbPutMany("keluar", c.kel), await dbPutMany("hari", hari), S.contoh = !0, await saveMeta("contoh", !0), toast("".concat(txs.length, " transaksi contoh ditambahkan")), render();
   },
-  formReset: () => showModal('<h2>Hapus semua data?</h2><p class="small muted" style="margin:0">Semua transaksi, uang keluar, dan riwayat hari akan hilang dari tablet ini. Menu dan pengaturan tetap. Cadangkan dulu bila perlu.</p>\n    <label class="field">PIN pemilik<input id="rPin" type="password" inputmode="numeric" autocomplete="off"></label>\n    <div class="row"><button class="btn" data-a="close">Batal</button><button class="btn coral" data-a="reset">Hapus semua</button></div>'),
+  formReset: () => showModal('<h2>Hapus semua data?</h2><p class="small muted" style="margin:0">Semua transaksi, uang keluar, dan riwayat hari akan hilang dari ' + (CL.on ? '<b>semua HP</b> yang memakai kode toko ini' : 'tablet ini') + '. Menu dan pengaturan tetap. Cadangkan dulu bila perlu.</p>\n    <label class="field">PIN pemilik<input id="rPin" type="password" inputmode="numeric" autocomplete="off"></label>\n    <div class="row"><button class="btn" data-a="close">Batal</button><button class="btn coral" data-a="reset">Hapus semua</button></div>'),
   reset: async () => {
     if (!cekPin($("#rPin").value)) {
       toast("PIN pemilik salah");
@@ -1326,7 +1521,7 @@ const A = {
   bahan: (v, el) => {
     const b = bahanById(el.dataset.id), k = el.dataset.k;
     if (!b) return;
-    b[k] = ["harga", "isi"].includes(k) ? Math.max(k === "isi" ? 1 : 0, parseInt(v, 10) || 0) : v;
+    b[k] = k === "harga" ? Math.max(0, parseInt(v, 10) || 0) : k === "isi" ? Math.max(0.1, parseFloat(String(v).replace(",", ".")) || 1) : v;
     const out = document.getElementById("bpu-" + b.id);
     out && (out.textContent = rp(Math.round(hargaUnit(b)))), perbaruiModal(), saveBahanSoon();
   },
@@ -1384,7 +1579,7 @@ document.addEventListener("click", (e) => {
     const fn = I[el.dataset.i];
     fn && fn(el.value, el);
   }
-  el.dataset && (el.dataset.i === "menuHarga" || el.dataset.i === "menuModal") && render();
+  el.dataset && (el.dataset.i === "menuHarga" || el.dataset.i === "menuHargaTn" || el.dataset.i === "menuModal") && render();
 }), document.addEventListener("keydown", (e) => {
   var _a;
   if (e.key === "Escape" && $("#modal").innerHTML) {
@@ -1408,23 +1603,151 @@ function tick() {
   const j = jkt(), c = $("#clk");
   c && (c.textContent = "".concat(j.hh, ".").concat(j.mm)), j.menit !== S.clockMin && (S.clockMin = j.menit, renderHeader(), cekPergantianHari());
 }
+/* ===== Hubungkan ke database toko ===== */
+const tungguCloud = () => new Promise((res) => {
+  if (window.__cloud !== void 0) return res(window.__cloud);
+  window.addEventListener("cloud-ready", () => res(window.__cloud), { once: !0 }), setTimeout(() => res(window.__cloud === void 0 ? null : window.__cloud), 2e4);
+});
+const ABJAD = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function buatKode() {
+  const r = new Uint8Array(8);
+  crypto.getRandomValues(r);
+  const k = [...r].map((x) => ABJAD[x % ABJAD.length]).join("");
+  return "PG-".concat(k.slice(0, 4), "-").concat(k.slice(4));
+}
+const rapiKode = (v) => String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^PG/, "").replace(/^(.{4})(.{1,4}).*$/, "PG-$1-$2");
+const linkToko = () => location.origin + location.pathname + "#toko=" + CL.kode;
+function infoToko() {
+  if (CL.on) return '<div class="note"><b>Database toko: <span class="num">'.concat(esc(CL.kode), "</span></b> \xB7 ").concat(navigator.onLine ? CL.pending ? "menyinkron…" : "tersinkron" : "offline, perubahan dikirim saat ada sinyal", '<br><span class="small">Pasang di HP lain: buka link aplikasi, pilih <b>Gabung</b>, lalu masukkan kode ini.</span></div>\n    <div class="row" style="flex-wrap:wrap"><button class="btn sm" data-a="salinKode">Salin kode</button><button class="btn sm" data-a="waKode">Kirim ke HP lain via WhatsApp</button><button class="btn sm" data-a="formKeluarToko">Keluar dari toko di HP ini</button></div>');
+  return window.__cloud && !window.__cloud.gagal ? '<div class="note warn"><b>Data hanya ada di HP ini.</b> Hubungkan ke database toko supaya menu, foto, dan transaksi sama di semua HP.<div class="row" style="margin-top:8px"><button class="btn sm pri" data-a="hubKembali">Hubungkan ke database toko</button></div></div>' : "";
+}
+function layarTunggu(judul, isi) {
+  $("#view").innerHTML = '<div class="hub"><h1>'.concat(judul, "</h1>").concat(isi || "", "</div>");
+}
+async function layarHubung() {
+  idb = await openDB();
+  const meta = Object.fromEntries((await dbAll("meta")).map((x) => [x.k, x.v])), ntx = (await dbAll("tx")).filter((t) => !t.contoh).length, nmenu = (meta.menu || []).length, nfoto = (meta.menu || []).filter((m) => m.foto).length;
+  const dariLink = (location.hash.match(/toko=([A-Za-z0-9-]+)/) || [])[1];
+  S.hubLokal = { meta, ntx, nmenu };
+  layarTunggu("Hubungkan ke database toko", '<p class="muted" style="margin:0">Semua HP yang memakai <b>kode toko</b> yang sama melihat menu, foto, transaksi, dan laporan yang sama. Tetap bisa dipakai saat sinyal hilang.</p>\n    <section class="panel hubc"><h2>Sudah punya kode toko?</h2><p class="small muted" style="margin:0">Minta kode dari HP pertama (Profil → Data &amp; cadangan).</p>\n      <label class="field">Kode toko<input id="hubKode" placeholder="PG-XXXX-XXXX" autocapitalize="characters" autocomplete="off" spellcheck="false" value="'.concat(esc(dariLink ? rapiKode(dariLink) : ""), '"></label>\n      ').concat(ntx ? '<p class="note warn small" style="margin:0">HP ini punya '.concat(ntx, " transaksi yang tidak ikut digabung. Cadangkan dulu bila masih perlu.</p>") : "", '\n      <button class="btn pri" data-a="hubGabung">Gabung ke toko</button></section>\n    <section class="panel hubc"><h2>HP pertama di toko?</h2><p class="small muted" style="margin:0">Buat database baru. ').concat(nmenu ? "Data di HP ini ikut diunggah: ".concat(nmenu, " menu").concat(nfoto ? " (" + nfoto + " foto)" : "").concat(ntx ? ", " + ntx + " transaksi" : "", ".") : "Mulai dengan menu bawaan.", '</p>\n      <button class="btn" data-a="hubBuat">Buat toko baru</button></section>\n    <button class="btn sm" style="align-self:center" data-a="hubLokal">Pakai di HP ini saja, tanpa sinkron</button>'));
+  const k = $("#hubKode");
+  k && !dariLink && k.focus();
+}
+function butuhInternet() {
+  return navigator.onLine ? !1 : (toast("Butuh internet untuk langkah ini"), !0);
+}
+function tombolSibuk(el, teks) {
+  const b = el && el.closest ? el.closest("button") : null;
+  b && (b.disabled = !0, b.textContent = teks);
+  return () => { b && (b.disabled = !1); };
+}
+Object.assign(A, {
+  hubGabung: async (d, e) => {
+    const kode = rapiKode($("#hubKode").value);
+    if (!/^PG-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(kode)) return toast("Kode toko berbentuk PG-XXXX-XXXX");
+    if (butuhInternet()) return;
+    const lepas = tombolSibuk(e && e.target, "Mengecek kode…");
+    try {
+      if (!await window.__cloud.ada(kode)) return lepas(), $("[data-a=hubGabung]").textContent = "Gabung ke toko", toast("Kode toko tidak ditemukan. Cek lagi hurufnya.");
+    } catch (x) {
+      return lepas(), $("[data-a=hubGabung]").textContent = "Gabung ke toko", toast("Tidak bisa menghubungi database: " + (x.code || x.message));
+    }
+    lsSet("pg-kode", kode), lsSet("pg-mode", null), location.replace(location.pathname + "#kasir"), location.reload();
+  },
+  hubBuat: async (d, e) => {
+    if (butuhInternet()) return;
+    const lepas = tombolSibuk(e && e.target, "Mengunggah data…"), api = window.__cloud, kode = buatKode();
+    try {
+      if (await api.ada(kode)) throw new Error("kode bentrok, coba lagi");
+      const meta = await dbAll("meta"), tx = await dbAll("tx"), kel = await dbAll("keluar"), hari = await dbAll("hari");
+      CL.api = api, CL.kode = kode, CL.on = !0;
+      const m = meta.find((x) => x.k === "menu"), lain = meta.filter((x) => x.k !== "menu" && x.k !== "dimulai");
+      const hasil = await Promise.all([cloudPut("meta", lain), m ? cloudMenu(m.v) : !0, cloudPut("tx", tx), cloudPut("keluar", kel), cloudPut("hari", hari)]);
+      if (hasil.includes(!1)) throw new Error("unggah gagal");
+      if (!await cloudPut("meta", [{ k: "dimulai", v: (meta.find((x) => x.k === "dimulai") || {}).v || isoNow() }])) throw new Error("unggah gagal");
+    } catch (x) {
+      CL.on = !1, CL.api = null, lepas(), $("[data-a=hubBuat]").textContent = "Buat toko baru";
+      return toast("Gagal membuat toko: " + (x.code || x.message));
+    }
+    lsSet("pg-kode", kode), lsSet("pg-mode", null), lsSet("pg-baru", "1"), location.replace(location.pathname + "#profil"), location.reload();
+  },
+  hubLokal: () => {
+    lsSet("pg-mode", "lokal"), location.reload();
+  },
+  hubKembali: () => {
+    lsSet("pg-mode", null), location.reload();
+  },
+  salinKode: async () => {
+    try {
+      await navigator.clipboard.writeText(CL.kode), toast("Kode ".concat(CL.kode, " disalin"));
+    } catch (x) {
+      toast("Kode toko: " + CL.kode);
+    }
+  },
+  waKode: () => {
+    window.open("https://wa.me/?text=" + encodeURIComponent("Kasir ".concat(S.set.nama || "Putraguci", ": buka link ini lalu pilih Gabung.\n").concat(linkToko(), "\nKode toko: ").concat(CL.kode)), "_blank");
+  },
+  formKeluarToko: () => showModal('<h2>Keluar dari toko di HP ini?</h2><p class="small muted" style="margin:0">Data toko tetap aman di database dan di HP lain. HP ini bisa gabung lagi dengan kode <b>'.concat(esc(CL.kode), '</b>.</p>\n    <label class="field">PIN pemilik<input id="kPin" type="password" inputmode="numeric" autocomplete="off"></label>\n    <div class="row"><button class="btn" data-a="close">Batal</button><button class="btn coral" data-a="keluarToko">Keluar</button></div>')),
+  keluarToko: () => {
+    if (!cekPin($("#kPin").value)) return toast("PIN pemilik salah");
+    lsSet("pg-kode", null), location.replace(location.pathname), location.reload();
+  }
+});
+function muatCloud() {
+  return new Promise((res) => {
+    let selesai = !1;
+    CL.cekAwal = () => {
+      !selesai && ["meta", "menu", "txd", "keluar", "hari"].every((c) => CL.awal[c]) && (CL.m.meta.has("dimulai") || CL.awalServer) && (selesai = !0, CL.cekAwal = null, res());
+    };
+    CL.api.hubungkan(CL.kode, terimaCloud, (c, err) => {
+      CL.err = err, renderSync();
+      const izin = err && err.code === "permission-denied";
+      toast(izin ? "Database menolak akses. Cek Rules & login Anonim di Firebase." : "Sinkron terputus: " + (err && (err.code || err.message)));
+      !selesai && layarTunggu("Tidak bisa membuka database toko", '<p class="muted">'.concat(izin ? "Firebase menolak akses. Pastikan <b>Anonymous sign-in</b> aktif dan <b>Rules</b> sudah ditempel (lihat PANDUAN-FIREBASE.md)." : esc(err && err.message || "Kesalahan tidak dikenal"), '</p><button class="btn" data-a="hubKeluarPaksa">Keluar dari toko ini</button>'));
+    });
+    setTimeout(() => {
+      selesai || layarTunggu("Menghubungkan ke toko ".concat(esc(CL.kode), "…"), '<p class="muted">'.concat(navigator.onLine ? "Sedang mengambil data toko." : "HP ini belum pernah mengambil data toko. Nyalakan internet sekali, data akan muncul otomatis.", '</p><button class="btn sm" data-a="hubKeluarPaksa">Keluar dari toko ini</button>'));
+    }, 2500);
+  });
+}
+A.hubKeluarPaksa = () => {
+  lsSet("pg-kode", null), location.replace(location.pathname), location.reload();
+};
+Object.assign(I, {
+  menuHargaTn: (v, el) => {
+    const m = menuById(el.dataset.id), n = parseInt(v, 10);
+    m && n >= 0 && n !== m.hargaTanpa && (m.hargaTanpa = n, m.diubah = hariIni(), saveMenuSoon());
+  }
+});
 async function start() {
   var _a, _b;
-  idb = await openDB();
+  $("#hdr").innerHTML = '<button class="logo" tabindex="-1" aria-hidden="true">PG</button><span class="title-m">Kasir Putraguci</span>';
+  const kode = lsGet("pg-kode"), api = await tungguCloud();
+  if (kode) {
+    if (!api || api.gagal) {
+      layarTunggu("Database toko belum bisa dimuat", '<p class="muted">'.concat(api ? "Nyalakan internet lalu buka ulang aplikasi. Setelah sekali terbuka, aplikasi tetap jalan tanpa sinyal." : "Konfigurasi Firebase belum diisi di file firebase-config.js.", '</p><div class="row"><button class="btn pri" onclick="location.reload()">Coba lagi</button><button class="btn" data-a="hubKeluarPaksa">Keluar dari toko</button></div>'));
+      return;
+    }
+    CL.api = api, CL.kode = kode, CL.on = !0, layarTunggu("Membuka toko…"), await muatCloud();
+  } else if (api && !api.gagal && lsGet("pg-mode") !== "lokal") {
+    await layarHubung();
+    return;
+  }
+  CL.on || (idb = await openDB());
   try {
     S.persist = await ((_b = (_a = navigator.storage) == null ? void 0 : _a.persist) == null ? void 0 : _b.call(_a));
   } catch (e) {
   }
   const meta = Object.fromEntries((await dbAll("meta")).map((x) => [x.k, x.v]));
-  if (S.set = __spreadValues(__spreadValues({}, SET0), meta.set || {}), S.menu = meta.menu || MENU0.map((m) => __spreadValues({}, m)), S.bahan = meta.bahan || BAHAN0.map((b) => __spreadValues({}, b)), S.overhead = meta.overhead || OVERHEAD0.map((o) => __spreadValues({}, o)), meta.resepV1 || (S.menu.forEach((m) => {
+  if (S.set = __spreadValues(__spreadValues({}, SET0), meta.set || {}), S.menu = meta.menu || MENU0.map((m) => __spreadValues({}, m)), S.bahan = meta.bahan || BAHAN0.map((b) => __spreadValues({}, b)), S.overhead = meta.overhead || OVERHEAD0.map((o) => __spreadValues({}, o)), meta.menuV2 || await migrasiMenuV2(), meta.resepV1 || (S.menu.forEach((m) => {
     !m.resep && RESEP0[m.id] && (m.resep = RESEP0[m.id].map(([bahanId, qty]) => ({ bahanId, qty })));
-  }), await saveMeta("resepV1", !0)), perbaruiModal(), await saveMeta("bahan", S.bahan), await saveMeta("overhead", S.overhead), await saveMeta("menu", S.menu), S.hargaAyam = meta.hargaAyam || [], S.aktif = meta.aktif || null, S.tx = await dbAll("tx"), S.keluar = await dbAll("keluar"), S.hari = await dbAll("hari"), S.contoh = !!meta.contoh, meta.menu || await saveMeta("menu", S.menu), meta.set || await saveMeta("set", S.set), !meta.dimulai && (await saveMeta("dimulai", isoNow()), !S.tx.length)) {
+  }), await saveMeta("resepV1", !0)), perbaruiModal(), await saveMeta("bahan", S.bahan), await saveMeta("overhead", S.overhead), await saveMeta("menu", S.menu), S.hargaAyam = meta.hargaAyam || [], S.aktif = meta.aktif || null, S.tx = await dbAll("tx"), S.keluar = await dbAll("keluar"), S.hari = await dbAll("hari"), S.contoh = !!meta.contoh, meta.menu || await saveMeta("menu", S.menu), meta.set || await saveMeta("set", S.set), !meta.dimulai && (await saveMeta("dimulai", isoNow()), !S.tx.length && !CL.on)) {
     const c = buatContoh();
     S.tx = c.txs, S.keluar = c.kel, S.hari = c.hari, S.hargaAyam = [{ tanggal: addDays(jkt().tanggal, -3), harga: 4e4 }], await dbPutMany("tx", S.tx), await dbPutMany("keluar", S.keluar), await dbPutMany("hari", S.hari), await saveMeta("hargaAyam", S.hargaAyam), S.contoh = !0, await saveMeta("contoh", !0);
   }
   perbaruiModal(), await saveMeta("menu", S.menu);
   const h = (location.hash || "").slice(1);
-  ["kasir", "hari", "laris", "untung", "riwayat", "profil"].includes(h) && (S.view = h), await cekPergantianHari(!0), render(), idb || toast("Penyimpanan perangkat tidak tersedia: data hilang saat aplikasi ditutup"), setInterval(tick, 1e3), document.addEventListener("visibilitychange", () => {
+  ["kasir", "hari", "laris", "untung", "riwayat", "profil"].includes(h) && (S.view = h), await cekPergantianHari(!0), render(), CL.on ? (CL.siap = !0, CL.kotor.forEach((c) => terapkanCloud(c)), CL.kotor.size && render(), CL.kotor.clear(), lsGet("pg-baru") && (lsSet("pg-baru", null), S.profilTab = "data", render(), toast("Toko dibuat · kode " + CL.kode)), addEventListener("online", renderSync), addEventListener("offline", renderSync)) : idb || toast("Penyimpanan perangkat tidak tersedia: data hilang saat aplikasi ditutup"), setInterval(tick, 1e3), document.addEventListener("visibilitychange", () => {
     document.hidden || (cekPergantianHari(), render());
   }), "serviceWorker" in navigator && location.protocol !== "file:" && navigator.serviceWorker.register("sw.js").catch(() => {
   });
